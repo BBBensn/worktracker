@@ -1,0 +1,13 @@
+{
+  "working": "false",
+  "on_break": "false",
+  "work_start": "2026-04-09T23:36:15+02:00",
+  "break_start": "04:40",
+  "break_end": "06:56",
+  "break_duration": "135",
+  "break_type": "Rauchen",
+  "zig_spicy": "",
+  "zig_blend": "",
+  "station": "Puls4",
+  "shift": "Nachtdienst"
+}

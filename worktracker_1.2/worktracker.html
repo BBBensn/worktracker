@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Worktracker · bensn.me</title>
+<meta name="description" content="Arbeitszeiterfassung — Schichten, Pausen, Zigaretten.">
+<link rel="manifest" href="/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Worktracker">
+<meta name="theme-color" content="#0a0a0b">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared/bensn.css">
+</head>
+<body>
+
+<div class="grid-bg"></div>
+<div class="blobs" id="blobs"></div>
+
+<div class="wrap">
+  <header class="intro-fade" style="animation-delay:0.05s">
+    <div class="logo-mark">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <rect x="2" y="2" width="6" height="6" rx="1.5" fill="rgba(255,255,255,0.5)"/>
+        <rect x="10" y="2" width="6" height="6" rx="1.5" fill="rgba(255,255,255,0.25)"/>
+        <rect x="2" y="10" width="6" height="6" rx="1.5" fill="rgba(255,255,255,0.25)"/>
+        <rect x="10" y="10" width="6" height="6" rx="1.5" fill="rgba(255,255,255,0.1)"/>
+      </svg>
+    </div>
+    <span class="logo-text"><span>bensn</span>.me / worktracker</span>
+    <div class="status-dot">
+      <div class="dot" id="statusDot" style="background:var(--muted);animation:none"></div>
+      <span id="statusText">laden…</span>
+    </div>
+  </header>
+
+  <section class="wt-hero intro-fade" style="animation-delay:0.15s">
+    <div class="eyebrow">Arbeitszeiterfassung</div>
+    <h1>Worktracker</h1>
+    <p class="subtitle">Schichten, Pausen, Zigaretten — live vom Server.</p>
+  </section>
+
+  <div class="tabs intro-fade" style="animation-delay:0.25s">
+    <button class="tab active" onclick="switchTab('aktiv',this)">Aktiv</button>
+    <button class="tab" onclick="switchTab('schichten',this)">Schichten</button>
+    <a class="tab" href="/eingabe" style="margin-left:auto;text-decoration:none;color:var(--accent-blue);border-bottom-color:transparent">+ Eingabe</a>
+  </div>
+
+  <div id="tab-aktiv" class="tab-section visible">
+    <div id="activeContent"><div class="state-msg">Daten werden geladen…</div></div>
+  </div>
+
+  <div id="tab-schichten" class="tab-section">
+    <div id="shiftsList"><div class="state-msg">Schichten werden geladen…</div></div>
+  </div>
+
+  <footer class="intro-fade" style="animation-delay:0.5s">
+    <span class="footer-left">worktracker.bensn.me</span>
+    <span class="footer-right" id="footer-clock"></span>
+  </footer>
+</div>
+
+<script src="/shared/bensn.js"></script>
+<script>
+  /* ── Clock ── */
+  function pad(n){return String(n).padStart(2,'0')}
+  function clockTick(){
+    const n=new Date();
+    const el=document.getElementById('footer-clock');
+    if(el) el.textContent=pad(n.getHours())+':'+pad(n.getMinutes())+':'+pad(n.getSeconds());
+  }
+  clockTick(); setInterval(clockTick,1000);
+
+  /* ── Tabs ── */
+  function switchTab(t,el){
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('tab-aktiv').classList.toggle('visible',t==='aktiv');
+    document.getElementById('tab-schichten').classList.toggle('visible',t==='schichten');
+    if(t==='schichten') loadShifts();
+  }
+
+  /* ── Helpers ── */
+  function fmtTime(iso){
+    if(!iso) return '—';
+    return new Date(iso).toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Vienna'});
+  }
+  function fmtDuration(min){
+    if(!min&&min!==0) return '—';
+    if(min<60) return min+' min';
+    return Math.floor(min/60)+'h '+(min%60)+'m';
+  }
+  function fmtDate(iso){
+    if(!iso) return '—';
+    const d=new Date(iso),t=new Date();
+    const diff=Math.floor((t-d)/86400000);
+    if(diff===0) return 'Heute';
+    if(diff===1) return 'Gestern';
+    return pad(d.getDate())+'.'+pad(d.getMonth()+1);
+  }
+  function schichtTyp(t){return({'früh':'Frühdienst','nachmittag':'Nachmittagsdienst','nacht':'Nachtdienst'}[t]||t||'—')}
+
+  /* ── API ── */
+  async function apiFetch(path){
+    const r=await fetch(path);
+    if(!r.ok) throw new Error(r.status+' '+r.statusText);
+    return r.json();
+  }
+
+  /* ── Render Active ── */
+  function renderActive(data){
+    const dot=document.getElementById('statusDot');
+    const statusText=document.getElementById('statusText');
+    const container=document.getElementById('activeContent');
+
+    if(!data||!data.shift){
+      dot.style.background='var(--muted)'; dot.style.animation='none';
+      statusText.textContent='kein aktiver dienst';
+      container.innerHTML='<div class="state-msg">Kein aktiver Dienst.<br><span style="font-size:11px">Starte einen Dienst über den iPhone-Shortcut.</span></div>';
+      return;
+    }
+
+    const s=data.shift, breaks=s.breaks||[], isActive=!s.work_end;
+    dot.style.background=isActive?'var(--green)':'var(--muted)';
+    dot.style.animation=isActive?'pulse 2s ease-in-out infinite':'none';
+    statusText.textContent=isActive?'dienst aktiv':'dienst beendet';
+
+    const totalPauseMin=breaks.filter(b=>b.break_end).reduce((a,b)=>a+Math.round((new Date(b.break_end)-new Date(b.break_start))/60000),0);
+    const nettoMin=Math.round(((s.work_end?new Date(s.work_end):new Date())-new Date(s.work_start))/60000)-totalPauseMin;
+    const cigSpicy=breaks.reduce((a,b)=>a+(b.zig_spicy||0),0);
+    const cigBlend=breaks.reduce((a,b)=>a+(b.zig_blend||0),0);
+    const cigTotal=cigSpicy+cigBlend;
+
+    const activePause=breaks.find(b=>!b.break_end);
+    const lastBreak=breaks.filter(b=>b.break_end).slice(-1)[0];
+    let pauseBar='';
+    if(activePause) pauseBar=`<div class="wt-pause-bar" style="color:var(--orange)">● Pause aktiv seit ${fmtTime(activePause.break_start)}</div>`;
+    else if(lastBreak) pauseBar=`<div class="wt-pause-bar">Pause inaktiv · Letzte: ${fmtTime(lastBreak.break_start)}–${fmtTime(lastBreak.break_end)}</div>`;
+
+    const breakRows=breaks.length===0
+      ?'<tr><td colspan="6" style="text-align:center;padding:12px 0;color:var(--muted)">Noch keine Pausen</td></tr>'
+      :breaks.map(b=>{
+        const dur=b.break_end?Math.round((new Date(b.break_end)-new Date(b.break_start))/60000):null;
+        const sc=b.zig_spicy||0, bc=b.zig_blend||0;
+        return `<tr>
+          <td>${fmtTime(b.break_start)}</td>
+          <td>${b.break_end?fmtTime(b.break_end):'<span style="color:var(--orange)">aktiv</span>'}</td>
+          <td>${dur!==null?dur+' min':'—'}</td>
+          <td class="muted">${b.break_type||'Pause'}</td>
+          <td class="center">${sc>0?`<span style="color:var(--orange);font-weight:500">${sc}</span>`:'<span style="color:rgba(255,255,255,.15)">—</span>'}</td>
+          <td class="center">${bc>0?`<span style="color:var(--accent-blue);font-weight:500">${bc}</span>`:'<span style="color:rgba(255,255,255,.15)">—</span>'}</td>
+        </tr>`;
+      }).join('');
+
+    container.innerHTML=`
+      <div class="wt-card">
+        <div class="wt-card-header">
+          <div>
+            <div class="wt-sender">${s.station||'—'}${s.duo_partner_station?` · ${s.duo_partner_station}`:''}</div>
+            <div class="wt-type">${schichtTyp(s.shift_type)}</div>
+          </div>
+          <div class="wt-badge ${isActive?'':'off'}">${isActive?'● Aktiv':'Beendet'}</div>
+        </div>
+        <div class="wt-stats">
+          <div class="wt-stat"><div class="wt-stat-val" style="color:var(--accent-blue)">${fmtTime(s.work_start)}</div><div class="wt-stat-label">Beginn</div></div>
+          <div class="wt-stat"><div class="wt-stat-val" style="color:var(--green)">${fmtDuration(nettoMin)}</div><div class="wt-stat-label">Netto</div></div>
+          <div class="wt-stat"><div class="wt-stat-val" style="color:var(--orange)">${totalPauseMin>0?totalPauseMin+' min':'—'}</div><div class="wt-stat-label">Gesamtpause</div></div>
+          <div class="wt-stat"><div class="wt-stat-val">${cigTotal}</div><div class="wt-stat-label">Zigaretten</div></div>
+        </div>
+        <div class="wt-label">Pausen</div>
+        <table class="wt-table">
+          <thead><tr>
+            <th>Von</th><th>Bis</th><th>Dauer</th><th>Typ</th>
+            <th class="center">S</th><th class="center">B</th>
+          </tr></thead>
+          <tbody>${breakRows}</tbody>
+        </table>
+        ${pauseBar}
+        <div class="wt-divider"></div>
+        <div class="wt-label">Zigaretten (Dienst gesamt)</div>
+        <div class="wt-cigs">
+          <div class="wt-cig"><div class="wt-cig-num" style="color:${cigSpicy>0?'var(--orange)':'rgba(255,255,255,.15)'}">${cigSpicy}</div><div class="wt-cig-label">Spicy</div></div>
+          <div class="wt-cig"><div class="wt-cig-num" style="color:${cigBlend>0?'var(--accent-blue)':'rgba(255,255,255,.15)'}">${cigBlend}</div><div class="wt-cig-label">Blend</div></div>
+          <div class="wt-cig"><div class="wt-cig-num">${cigTotal}</div><div class="wt-cig-label">Gesamt</div></div>
+        </div>
+      </div>`;
+  }
+
+  /* ── Render Shifts ── */
+  function renderShifts(shifts){
+    const list=document.getElementById('shiftsList');
+    if(!shifts||shifts.length===0){list.innerHTML='<div class="state-msg">Noch keine Schichten vorhanden.</div>';return;}
+    list.innerHTML='';
+    shifts.forEach((s,i)=>{
+      const isActive=!s.work_end;
+      const grossMin=s.work_end?Math.round((new Date(s.work_end)-new Date(s.work_start))/60000):null;
+      const nettoMin=grossMin!==null?grossMin-(s.total_break_minutes||0):null;
+      const cigTotal=s.zig_total||0;
+      const stationLabel=s.station+(s.duo_partner_station?` · ${s.duo_partner_station}`:'');
+
+      const el=document.createElement('div');
+      el.className='wt-shift-row';
+      el.style.cssText='opacity:0;transform:translateY(12px);transition:opacity .5s ease,transform .5s ease';
+
+      el.innerHTML=`
+        <div class="wt-shift-dot ${isActive?'active':''}"></div>
+        <div style="min-width:0">
+          <div class="wt-shift-sender">${stationLabel}</div>
+          <div class="wt-shift-meta">${fmtDate(s.work_start)} · ${schichtTyp(s.shift_type)} · ${fmtTime(s.work_start)} → ${fmtTime(s.work_end)}</div>
+          ${cigTotal>0?`<span class="tag">${cigTotal} Zig.</span>`:''}
+          ${(s.total_break_minutes||0)>0?`<span class="tag">${s.total_break_minutes} min Pause</span>`:''}
+          ${s.notes?`<span class="tag" style="color:var(--accent-blue)">Notiz</span>`:''}
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div class="wt-shift-netto">${nettoMin!==null?fmtDuration(nettoMin):'—'}</div>
+          <div class="wt-shift-status" style="color:${isActive?'var(--green)':'var(--muted)'}">${isActive?'aktiv':'abgeschlossen'}</div>
+          <div class="expand-arrow" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-top:4px">▼</div>
+        </div>
+        <div class="shift-detail" style="display:none;grid-column:1/-1;border-top:1px solid var(--border);padding-top:1rem;margin-top:.5rem">
+          <div id="detail-${s.id}"><div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);text-align:center;padding:.5rem">Laden…</div></div>
+        </div>`;
+
+      el.style.cursor='pointer';
+      el.addEventListener('click', ()=>toggleShiftDetail(el, s.id));
+      list.appendChild(el);
+      setTimeout(()=>{el.style.opacity='1';el.style.transform='none';},100+i*80);
+    });
+  }
+
+  async function toggleShiftDetail(el, shiftId){
+    const detail=el.querySelector('.shift-detail');
+    const arrow=el.querySelector('.expand-arrow');
+    const isOpen=detail.style.display!=='none';
+
+    if(isOpen){
+      detail.style.display='none';
+      arrow.textContent='▼';
+      return;
+    }
+
+    detail.style.display='block';
+    arrow.textContent='▲';
+
+    // Load breaks for this shift
+    try{
+      const data=await apiFetch(`/api/shift/${shiftId}`);
+      const breaks=data.breaks||[];
+      const container=document.getElementById(`detail-${shiftId}`);
+
+      let html='';
+
+      // Notes
+      if(data.notes){
+        html+=`<div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:.75rem">
+          <span style="letter-spacing:.08em;text-transform:uppercase;font-size:9px">Anmerkung</span><br>
+          <span style="color:var(--text)">${data.notes}</span>
+        </div>`;
+      }
+
+      // Duo partner
+      if(data.duo_partner_station){
+        html+=`<div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:.75rem">
+          <span style="letter-spacing:.08em;text-transform:uppercase;font-size:9px">Zweiter Sender</span><br>
+          <span style="color:var(--text)">${data.duo_partner_station}</span>
+        </div>`;
+      }
+
+      // Breaks table
+      if(breaks.length===0){
+        html+=`<div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);text-align:center;padding:.5rem">Keine Pausen</div>`;
+      } else {
+        html+=`<table class="wt-table" style="margin-bottom:.5rem">
+          <thead><tr><th>Von</th><th>Bis</th><th>Dauer</th><th>Typ</th><th class="center">S</th><th class="center">B</th></tr></thead>
+          <tbody>`;
+        breaks.forEach(b=>{
+          const dur=b.break_end?Math.round((new Date(b.break_end)-new Date(b.break_start))/60000):null;
+          const sc=b.zig_spicy||0,bc=b.zig_blend||0;
+          html+=`<tr>
+            <td>${fmtTime(b.break_start)}</td>
+            <td>${b.break_end?fmtTime(b.break_end):'aktiv'}</td>
+            <td>${dur!==null?dur+' min':'—'}</td>
+            <td class="muted">${b.break_type||'Pause'}</td>
+            <td class="center">${sc>0?`<span style="color:var(--orange);font-weight:500">${sc}</span>`:'<span style="color:rgba(255,255,255,.15)">—</span>'}</td>
+            <td class="center">${bc>0?`<span style="color:var(--accent-blue);font-weight:500">${bc}</span>`:'<span style="color:rgba(255,255,255,.15)">—</span>'}</td>
+          </tr>`;
+        });
+        html+=`</tbody></table>`;
+      }
+
+      container.innerHTML=html;
+    }catch(e){
+      document.getElementById(`detail-${shiftId}`).innerHTML=
+        `<div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--accent-red)">Fehler: ${e.message}</div>`;
+    }
+  }
+
+  /* ── Load ── */
+  async function loadActive(){
+    try{
+      const data=await apiFetch('/api/shift/current');
+      renderActive(data);
+    }catch(e){
+      document.getElementById('statusDot').style.background='var(--accent-red)';
+      document.getElementById('statusText').textContent='fehler';
+      document.getElementById('activeContent').innerHTML=`<div class="state-msg">Verbindungsfehler<br><span style="color:var(--accent-red);font-size:11px">${e.message}</span></div>`;
+    }
+  }
+
+  let shiftsLoaded=false;
+  async function loadShifts(){
+    const list=document.getElementById('shiftsList');
+    list.innerHTML='<div class="state-msg">Schichten werden geladen…</div>';
+    try{
+      const data=await apiFetch('/api/shifts?limit=30');
+      renderShifts(data.shifts||data);
+      shiftsLoaded=true;
+    }catch(e){
+      list.innerHTML=`<div class="state-msg">Fehler: ${e.message}<br><button onclick="loadShifts()" style="margin-top:.75rem;font-family:'DM Mono',monospace;font-size:11px;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 14px;border-radius:6px;cursor:pointer">Neu laden</button></div>`;
+    }
+  }
+
+  // PWA: tap error to reload
+  document.addEventListener('click', e=>{
+    if(e.target.closest('.state-msg')&&e.target.tagName!=='BUTTON') loadActive();
+  });
+
+  loadActive();
+  setInterval(loadActive, 30000);
+</script>
+
+</body>
+</html>

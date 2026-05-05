@@ -1,0 +1,2300 @@
+Diff summary generated: Mon Apr 20 23:43:10 CEST 2026
+---
+COMPARE: worktracker_1.2 -> worktracker_1.3
+
+ADDED: eingabe.html
+ADDED: patch_cafe_puls.sh
+REMOVED: sw.js
+REMOVED: worktracker.html
+
+---
+COMPARE: worktracker_1.3 -> worktracker_1.4
+
+MODIFIED: eingabe.html
+---DIFF_START: eingabe.html
+--- Worktracker/worktracker_1.3/eingabe.html	2026-04-10 20:14:12
++++ Worktracker/worktracker_1.4/eingabe.html	2026-04-10 20:32:50
+@@ -484,6 +484,11 @@
+       </div>
+     </div>
+ 
++    <div class="form-group">
++      <label class="form-label">Anmerkung (optional)</label>
++      <input type="text" class="text-input" id="pauseNote" placeholder="z.B. länger als geplant…">
++    </div>
++
+     <button class="submit-btn orange" onclick="submitPauseEnd()">Pause beenden</button>
+   </div>
+ 
+@@ -789,12 +794,14 @@
+   const pauseType = state.pauseTypes.length > 0
+     ? state.pauseTypes.join(' + ')
+     : 'Pause';
++  const notes = document.getElementById('pauseNote')?.value || null;
+ 
+   try {
+     const d = await apiFetch('/api/break/end', 'POST', {
+       zig_spicy: state.spicy,
+       zig_blend: state.blend,
+       break_type: pauseType,
++      notes: notes || undefined,
+       source: 'pwa'
+     });
+     if(d.break) {
+---DIFF_END: eingabe.html
+
+ADDED: worktracker.html
+REMOVED: patch_cafe_puls.sh
+
+---
+COMPARE: worktracker_1.4 -> worktracker_1.5
+
+ADDED: patch_breaks_notes.py
+
+---
+COMPARE: worktracker_1.5 -> worktracker_1.6
+
+MODIFIED: worktracker.html
+---DIFF_START: worktracker.html
+--- Worktracker/worktracker_1.5/worktracker.html	2026-04-10 20:53:28
++++ Worktracker/worktracker_1.6/worktracker.html	2026-04-10 23:12:31
+@@ -13,6 +13,7 @@
+ <link rel="apple-touch-icon" href="/icons/icon-192.png">
+ <link rel="preconnect" href="https://fonts.googleapis.com">
+ <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;700;800&display=swap" rel="stylesheet">
++<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,300,0,0&icon_names=smoking_rooms,sanitizer,shopping_bag,restaurant,more_horiz" rel="stylesheet">
+ <link rel="stylesheet" href="/shared/bensn.css">
+ <style>
+ /* ── App Layout ── */
+@@ -100,8 +101,29 @@
+ .tab:hover:not(.active) { color: var(--text); }
+ .tab-section { display: none; } .tab-section.visible { display: block; }
+ 
+-/* Shift detail expand arrow */
++/* Expand arrow */
+ .expand-arrow { font-size: 9px !important; }
++
++/* Material Symbols */
++.ms {
++  font-family: 'Material Symbols Outlined';
++  font-size: 14px;
++  line-height: 1;
++  opacity: .45;
++  vertical-align: middle;
++  user-select: none;
++}
++
++/* Pause table – wider S/B columns */
++.wt-table th.col-s, .wt-table td.col-s,
++.wt-table th.col-b, .wt-table td.col-b {
++  text-align: center;
++  width: 28px;
++  padding-right: 4px;
++}
++.wt-table th.col-typ, .wt-table td.col-typ {
++  width: 60px;
++}
+ </style>
+ </head>
+ <body>
+@@ -188,6 +210,19 @@
+     const r=await fetch(path);
+     if(!r.ok) throw new Error(r.status+' '+r.statusText);
+     return r.json();
++  }
++
++  /* ── Pause Type Icons ── */
++  function pauseIcons(type) {
++    if(!type) return '<span class="ms">more_horiz</span>';
++    const t = type.toLowerCase();
++    const icons = [];
++    if(t.includes('rauchen'))    icons.push('smoking_rooms');
++    if(t.includes('wc'))         icons.push('sanitizer');
++    if(t.includes('einkaufen'))  icons.push('shopping_bag');
++    if(t.includes('essen'))      icons.push('restaurant');
++    if(!icons.length)            icons.push('more_horiz');
++    return icons.map(i=>`<span class="ms">${i}</span>`).join('');
+   }
+ 
+   /* ── Render Active ── */
+@@ -225,14 +260,17 @@
+       :breaks.map(b=>{
+         const dur=b.break_end?Math.round((new Date(b.break_end)-new Date(b.break_start))/60000):null;
+         const sc=b.zig_spicy||0, bc=b.zig_blend||0;
+-        return `<tr>
++        const hasNote=b.notes&&b.notes.trim();
++        const row=`<tr>
+           <td>${fmtTime(b.break_start)}</td>
+           <td>${b.break_end?fmtTime(b.break_end):'<span style="color:var(--orange)">aktiv</span>'}</td>
+           <td>${dur!==null?dur+' min':'—'}</td>
+-          <td class="muted">${b.break_type||'Pause'}</td>
+-          <td class="center">${sc>0?`<span style="color:var(--orange);font-weight:500">${sc}</span>`:'<span style="color:rgba(255,255,255,.15)">—</span>'}</td>
+-          <td class="center">${bc>0?`<span style="color:var(--accent-blue);font-weight:500">${bc}</span>`:'<span style="color:rgba(255,255,255,.15)">—</span>'}</td>
++          <td class="col-typ">${pauseIcons(b.break_type)}${hasNote?'<span style="color:var(--accent-blue);margin-left:3px;font-size:10px">●</span>':''}</td>
++          <td class="col-s">${sc>0?`<span style="color:var(--orange);font-weight:500">${sc}</span>`:'<span style="color:rgba(255,255,255,.15)">—</span>'}</td>
++          <td class="col-b">${bc>0?`<span style="color:var(--accent-blue);font-weight:500">${bc}</span>`:'<span style="color:rgba(255,255,255,.15)">—</span>'}</td>
+         </tr>`;
++        const noteRow=hasNote?`<tr><td colspan="6" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);padding-bottom:8px;padding-top:2px">↳ ${b.notes}</td></tr>`:'';
++        return row+noteRow;
+       }).join('');
+ 
+     container.innerHTML=`
+@@ -253,8 +291,8 @@
+         <div class="wt-label">Pausen</div>
+         <table class="wt-table">
+           <thead><tr>
+-            <th>Von</th><th>Bis</th><th>Dauer</th><th>Typ</th>
+-            <th class="center">S</th><th class="center">B</th>
++            <th>Von</th><th>Bis</th><th>Dauer</th><th class="col-typ"></th>
++            <th class="col-s">S</th><th class="col-b">B</th>
+           </tr></thead>
+           <tbody>${breakRows}</tbody>
+         </table>
+@@ -360,7 +398,7 @@
+         html+=`<div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);text-align:center;padding:.5rem">Keine Pausen</div>`;
+       } else {
+         html+=`<table class="wt-table" style="margin-bottom:.5rem">
+-          <thead><tr><th>Von</th><th>Bis</th><th>Dauer</th><th>Typ</th><th class="center">S</th><th class="center">B</th></tr></thead>
++          <thead><tr><th>Von</th><th>Bis</th><th>Dauer</th><th class="col-typ"></th><th class="col-s">S</th><th class="col-b">B</th></tr></thead>
+           <tbody>`;
+         breaks.forEach(b=>{
+           const dur=b.break_end?Math.round((new Date(b.break_end)-new Date(b.break_start))/60000):null;
+@@ -370,11 +408,11 @@
+             <td>${fmtTime(b.break_start)}</td>
+             <td>${b.break_end?fmtTime(b.break_end):'aktiv'}</td>
+             <td>${dur!==null?dur+' min':'—'}</td>
+-            <td class="muted">${b.break_type||'Pause'}${hasNote?` <span title="${b.notes}" style="cursor:help;color:var(--accent-blue)">●</span>`:''}</td>
+-            <td class="center">${sc>0?`<span style="color:var(--orange);font-weight:500">${sc}</span>`:'<span style="color:rgba(255,255,255,.15)">—</span>'}</td>
+-            <td class="center">${bc>0?`<span style="color:var(--accent-blue);font-weight:500">${bc}</span>`:'<span style="color:rgba(255,255,255,.15)">—</span>'}</td>
++            <td class="col-typ">${pauseIcons(b.break_type)}${hasNote?'<span style="color:var(--accent-blue);margin-left:3px;font-size:10px">●</span>':''}</td>
++            <td class="col-s">${sc>0?`<span style="color:var(--orange);font-weight:500">${sc}</span>`:'<span style="color:rgba(255,255,255,.15)">—</span>'}</td>
++            <td class="col-b">${bc>0?`<span style="color:var(--accent-blue);font-weight:500">${bc}</span>`:'<span style="color:rgba(255,255,255,.15)">—</span>'}</td>
+           </tr>`;
+-          if(hasNote) {
++          if(hasNote){
+             html+=`<tr><td colspan="6" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);padding-bottom:8px;padding-top:2px">↳ ${b.notes}</td></tr>`;
+           }
+         });
+---DIFF_END: worktracker.html
+
+REMOVED: eingabe.html
+REMOVED: patch_breaks_notes.py
+
+---
+COMPARE: worktracker_1.6 -> worktracker_1.6.1
+
+MODIFIED: worktracker.html
+---DIFF_START: worktracker.html
+--- Worktracker/worktracker_1.6/worktracker.html	2026-04-10 23:12:31
++++ Worktracker/worktracker_1.6.1/worktracker.html	2026-04-10 23:16:43
+@@ -13,7 +13,6 @@
+ <link rel="apple-touch-icon" href="/icons/icon-192.png">
+ <link rel="preconnect" href="https://fonts.googleapis.com">
+ <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;700;800&display=swap" rel="stylesheet">
+-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,300,0,0&icon_names=smoking_rooms,sanitizer,shopping_bag,restaurant,more_horiz" rel="stylesheet">
+ <link rel="stylesheet" href="/shared/bensn.css">
+ <style>
+ /* ── App Layout ── */
+@@ -104,16 +103,6 @@
+ /* Expand arrow */
+ .expand-arrow { font-size: 9px !important; }
+ 
+-/* Material Symbols */
+-.ms {
+-  font-family: 'Material Symbols Outlined';
+-  font-size: 14px;
+-  line-height: 1;
+-  opacity: .45;
+-  vertical-align: middle;
+-  user-select: none;
+-}
+-
+ /* Pause table – wider S/B columns */
+ .wt-table th.col-s, .wt-table td.col-s,
+ .wt-table th.col-b, .wt-table td.col-b {
+@@ -212,17 +201,25 @@
+     return r.json();
+   }
+ 
+-  /* ── Pause Type Icons ── */
+-  function pauseIcons(type) {
+-    if(!type) return '<span class="ms">more_horiz</span>';
++  /* ── Pause Type Icons (inline SVG) ── */
++  const ICONS = {
++    rauchen:   `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.45;vertical-align:middle"><path d="M2 16h14v3H2z"/><path d="M18 16h4v3h-4z"/><path d="M18 8c0-2.5 2-2.5 2-5"/><path d="M14 8c0-2.5 2-2.5 2-5"/></svg>`,
++    wc:        `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.45;vertical-align:middle"><path d="M12 2a3 3 0 100 6 3 3 0 000-6z"/><path d="M7 22V12a5 5 0 0110 0v10"/><path d="M7 17h10"/></svg>`,
++    einkaufen: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.45;vertical-align:middle"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 01-8 0"/></svg>`,
++    essen:     `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.45;vertical-align:middle"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><path d="M6 1v3M10 1v3M14 1v3"/></svg>`,
++    sonstiges: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.45;vertical-align:middle"><circle cx="5" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="19" cy="12" r="1" fill="currentColor"/></svg>`,
++  };
++
++  function pauseIcons(type) {
++    if(!type) return ICONS.sonstiges;
+     const t = type.toLowerCase();
+-    const icons = [];
+-    if(t.includes('rauchen'))    icons.push('smoking_rooms');
+-    if(t.includes('wc'))         icons.push('sanitizer');
+-    if(t.includes('einkaufen'))  icons.push('shopping_bag');
+-    if(t.includes('essen'))      icons.push('restaurant');
+-    if(!icons.length)            icons.push('more_horiz');
+-    return icons.map(i=>`<span class="ms">${i}</span>`).join('');
++    const result = [];
++    if(t.includes('rauchen'))   result.push(ICONS.rauchen);
++    if(t.includes('wc'))        result.push(ICONS.wc);
++    if(t.includes('einkaufen')) result.push(ICONS.einkaufen);
++    if(t.includes('essen'))     result.push(ICONS.essen);
++    if(!result.length)          result.push(ICONS.sonstiges);
++    return result.join('');
+   }
+ 
+   /* ── Render Active ── */
+---DIFF_END: worktracker.html
+
+
+---
+COMPARE: worktracker_1.6.1 -> worktracker_1.7
+
+MODIFIED: worktracker.html
+---DIFF_START: worktracker.html
+--- Worktracker/worktracker_1.6.1/worktracker.html	2026-04-10 23:16:43
++++ Worktracker/worktracker_1.7/worktracker.html	2026-04-10 23:31:33
+@@ -416,11 +416,133 @@
+         html+=`</tbody></table>`;
+       }
+ 
+-      container.innerHTML=html;
++      container.innerHTML=html+`
++        <div class="wt-divider" style="margin:.75rem 0"></div>
++        <button onclick="toggleEditForm('${shiftId}')" style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:6px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--border-hover)'" onmouseout="this.style.borderColor='var(--border)'">Bearbeiten</button>
++
++        <div id="edit-${shiftId}" style="display:none;margin-top:1rem">
++          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem">
++            <div>
++              <div class="wt-label" style="margin-bottom:4px">Beginn</div>
++              <input id="edit-start-${shiftId}" type="datetime-local" value="${toLocalISO(data.work_start)}"
++                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;outline:none;-webkit-appearance:none">
++            </div>
++            <div>
++              <div class="wt-label" style="margin-bottom:4px">Ende</div>
++              <input id="edit-end-${shiftId}" type="datetime-local" value="${data.work_end?toLocalISO(data.work_end):''}"
++                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;outline:none;-webkit-appearance:none">
++            </div>
++          </div>
++          <div style="margin-bottom:.75rem">
++            <div class="wt-label" style="margin-bottom:4px">Station</div>
++            <div style="display:flex;flex-wrap:wrap;gap:.4rem" id="edit-station-${shiftId}">
++              ${['Puls4','ATV','ATV2','Puls24'].map(s=>`
++                <div onclick="selectEditStation('${shiftId}','${s}')" data-val="${s}"
++                  style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.station===s?'var(--accent-blue)':'var(--border)'};color:${data.station===s?'var(--accent-blue)':'var(--muted)'};background:${data.station===s?'rgba(0,166,251,.08)':'none'};cursor:pointer;transition:all .15s">${s}</div>
++              `).join('')}
++            </div>
++          </div>
++          <div style="margin-bottom:.75rem">
++            <div class="wt-label" style="margin-bottom:4px">Schichttyp</div>
++            <div style="display:flex;gap:.4rem" id="edit-type-${shiftId}">
++              ${[['früh','Früh'],['nachmittag','Nachmittag'],['nacht','Nacht']].map(([v,l])=>`
++                <div onclick="selectEditType('${shiftId}','${v}')" data-val="${v}"
++                  style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.shift_type===v?'var(--accent-blue)':'var(--border)'};color:${data.shift_type===v?'var(--accent-blue)':'var(--muted)'};background:${data.shift_type===v?'rgba(0,166,251,.08)':'none'};cursor:pointer;transition:all .15s">${l}</div>
++              `).join('')}
++            </div>
++          </div>
++          <div style="margin-bottom:1rem">
++            <div class="wt-label" style="margin-bottom:4px">Anmerkung</div>
++            <input id="edit-notes-${shiftId}" type="text" value="${data.notes||''}" placeholder="Optional…"
++              style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;outline:none">
++          </div>
++          <div style="display:flex;gap:.5rem">
++            <button onclick="saveEdit('${shiftId}')"
++              style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.06em;background:var(--green);color:#0a0a0b;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-weight:500">Speichern</button>
++            <button onclick="toggleEditForm('${shiftId}')"
++              style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.06em;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 16px;cursor:pointer">Abbrechen</button>
++          </div>
++          <div id="edit-msg-${shiftId}" style="font-family:'DM Mono',monospace;font-size:11px;margin-top:.5rem"></div>
++        </div>`;
+     }catch(e){
+       document.getElementById(`detail-${shiftId}`).innerHTML=
+         `<div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--accent-red)">Fehler: ${e.message}</div>`;
++    }
++  }
++
++  /* ── Edit Helpers ── */
++  function toLocalISO(iso) {
++    if(!iso) return '';
++    const d = new Date(iso);
++    const pad = n => String(n).padStart(2,'0');
++    // Convert to Vienna time for datetime-local input
++    const vienna = new Date(d.toLocaleString('en-US', {timeZone:'Europe/Vienna'}));
++    return `${vienna.getFullYear()}-${pad(vienna.getMonth()+1)}-${pad(vienna.getDate())}T${pad(vienna.getHours())}:${pad(vienna.getMinutes())}`;
++  }
++
++  function toggleEditForm(shiftId) {
++    const form = document.getElementById(`edit-${shiftId}`);
++    form.style.display = form.style.display === 'none' ? 'block' : 'none';
++  }
++
++  function selectEditStation(shiftId, val) {
++    document.querySelectorAll(`#edit-station-${shiftId} div`).forEach(el => {
++      const active = el.dataset.val === val;
++      el.style.borderColor = active ? 'var(--accent-blue)' : 'var(--border)';
++      el.style.color = active ? 'var(--accent-blue)' : 'var(--muted)';
++      el.style.background = active ? 'rgba(0,166,251,.08)' : 'none';
++    });
++  }
++
++  function selectEditType(shiftId, val) {
++    document.querySelectorAll(`#edit-type-${shiftId} div`).forEach(el => {
++      const active = el.dataset.val === val;
++      el.style.borderColor = active ? 'var(--accent-blue)' : 'var(--border)';
++      el.style.color = active ? 'var(--accent-blue)' : 'var(--muted)';
++      el.style.background = active ? 'rgba(0,166,251,.08)' : 'none';
++    });
++  }
++
++  async function saveEdit(shiftId) {
++    const startVal = document.getElementById(`edit-start-${shiftId}`).value;
++    const endVal   = document.getElementById(`edit-end-${shiftId}`).value;
++    const notesVal = document.getElementById(`edit-notes-${shiftId}`).value;
++    const station  = document.querySelector(`#edit-station-${shiftId} div[style*="rgba(0,166,251"]`)?.dataset.val;
++    const shiftType = document.querySelector(`#edit-type-${shiftId} div[style*="rgba(0,166,251"]`)?.dataset.val;
++    const msg = document.getElementById(`edit-msg-${shiftId}`);
++
++    // Convert local datetime-local value back to UTC ISO
++    function localToISO(val) {
++      if(!val) return null;
++      // datetime-local is in Vienna time, convert to UTC
++      const local = new Date(val);
++      return local.toISOString();
+     }
++
++    const payload = { corrected_reason: 'Manuelle Korrektur' };
++    if(startVal)   payload.work_start  = localToISO(startVal);
++    if(endVal)     payload.work_end    = localToISO(endVal);
++    if(station)    payload.station     = station;
++    if(shiftType)  payload.shift_type  = shiftType;
++    payload.notes = notesVal || null;
++
++    try {
++      const d = await apiFetch(`/api/shift/${shiftId}/correct`, 'PATCH', payload);
++      if(d.shift) {
+---DIFF_END: worktracker.html
+
+
+---
+COMPARE: worktracker_1.7 -> worktracker_1.7.1
+
+MODIFIED: worktracker.html
+---DIFF_START: worktracker.html
+--- Worktracker/worktracker_1.7/worktracker.html	2026-04-10 23:31:33
++++ Worktracker/worktracker_1.7.1/worktracker.html	2026-04-10 23:37:14
+@@ -339,7 +339,10 @@
+         </div>`;
+ 
+       el.style.cursor='pointer';
+-      el.addEventListener('click', ()=>toggleShiftDetail(el, s.id));
++      el.addEventListener('click', (e)=>{
++        if(e.target.closest('.shift-detail')) return;
++        toggleShiftDetail(el, s.id);
++      });
+       list.appendChild(el);
+       setTimeout(()=>{el.style.opacity='1';el.style.transform='none';},100+i*80);
+     });
+@@ -418,9 +421,9 @@
+ 
+       container.innerHTML=html+`
+         <div class="wt-divider" style="margin:.75rem 0"></div>
+-        <button onclick="toggleEditForm('${shiftId}')" style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:6px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--border-hover)'" onmouseout="this.style.borderColor='var(--border)'">Bearbeiten</button>
++        <button onclick="event.stopPropagation();toggleEditForm('${shiftId}')" style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:6px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--border-hover)'" onmouseout="this.style.borderColor='var(--border)'">Bearbeiten</button>
+ 
+-        <div id="edit-${shiftId}" style="display:none;margin-top:1rem">
++        <div id="edit-${shiftId}" style="display:none;margin-top:1rem" onclick="event.stopPropagation()">
+           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem">
+             <div>
+               <div class="wt-label" style="margin-bottom:4px">Beginn</div>
+---DIFF_END: worktracker.html
+
+
+---
+COMPARE: worktracker_1.7.1 -> worktracker_1.8
+
+MODIFIED: worktracker.html
+---DIFF_START: worktracker.html
+--- Worktracker/worktracker_1.7.1/worktracker.html	2026-04-10 23:37:14
++++ Worktracker/worktracker_1.8/worktracker.html	2026-04-11 00:10:30
+@@ -404,7 +404,8 @@
+           const dur=b.break_end?Math.round((new Date(b.break_end)-new Date(b.break_start))/60000):null;
+           const sc=b.zig_spicy||0,bc=b.zig_blend||0;
+           const hasNote = b.notes && b.notes.trim();
+-          html+=`<tr>
++          const rowId = `brow-${b.id}`;
++          html+=`<tr id="${rowId}" style="cursor:pointer" title="Lang drücken zum Bearbeiten">
+             <td>${fmtTime(b.break_start)}</td>
+             <td>${b.break_end?fmtTime(b.break_end):'aktiv'}</td>
+             <td>${dur!==null?dur+' min':'—'}</td>
+@@ -415,6 +416,11 @@
+           if(hasNote){
+             html+=`<tr><td colspan="6" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);padding-bottom:8px;padding-top:2px">↳ ${b.notes}</td></tr>`;
+           }
++          // Setup long press after render
++          setTimeout(()=>{
++            const rowEl = document.getElementById(rowId);
++            if(rowEl) setupBreakLongPress(rowEl, b.id, shiftId);
++          }, 50);
+         });
+         html+=`</tbody></table>`;
+       }
+@@ -428,7 +434,8 @@
+             <div>
+               <div class="wt-label" style="margin-bottom:4px">Beginn</div>
+               <input id="edit-start-${shiftId}" type="datetime-local" value="${toLocalISO(data.work_start)}"
+-                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;outline:none;-webkit-appearance:none">
++                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;outline:none;-webkit-appearance:none"
++                onfocus="this.showPicker&&this.showPicker()">
+             </div>
+             <div>
+               <div class="wt-label" style="margin-bottom:4px">Ende</div>
+@@ -478,9 +485,32 @@
+     if(!iso) return '';
+     const d = new Date(iso);
+     const pad = n => String(n).padStart(2,'0');
+-    // Convert to Vienna time for datetime-local input
+-    const vienna = new Date(d.toLocaleString('en-US', {timeZone:'Europe/Vienna'}));
+-    return `${vienna.getFullYear()}-${pad(vienna.getMonth()+1)}-${pad(vienna.getDate())}T${pad(vienna.getHours())}:${pad(vienna.getMinutes())}`;
++    const tz = new Intl.DateTimeFormat('en-CA', {
++      timeZone: 'Europe/Vienna',
++      year: 'numeric', month: '2-digit', day: '2-digit',
++      hour: '2-digit', minute: '2-digit', hour12: false
++    }).formatToParts(d);
++    const p = {};
++    tz.forEach(({type,value}) => p[type]=value);
++    return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
++  }
++
++  function localToUTC(val) {
++    if(!val) return null;
++    // val is "YYYY-MM-DDTHH:MM" in Vienna time
++    // Append Vienna offset manually via Date parsing
++    const [date, time] = val.split('T');
++    const [y,m,d] = date.split('-');
++    const [h,min] = time.split(':');
++    // Create date as if UTC, then offset
++    const utc = new Date(Date.UTC(+y,+m-1,+d,+h,+min));
++    // Get Vienna offset at that moment
++    const viennaStr = utc.toLocaleString('en-US',{timeZone:'Europe/Vienna',hour12:false,hour:'2-digit',minute:'2-digit'}).replace('24:','00:');
++    const viennaH = parseInt(viennaStr.split(':')[0]);
++    const utcH = utc.getUTCHours();
++    const offset = viennaH - utcH;
++    utc.setUTCHours(utc.getUTCHours() - offset);
++    return utc.toISOString();
+   }
+ 
+   function toggleEditForm(shiftId) {
+@@ -507,26 +537,18 @@
+   }
+ 
+   async function saveEdit(shiftId) {
+-    const startVal = document.getElementById(`edit-start-${shiftId}`).value;
+-    const endVal   = document.getElementById(`edit-end-${shiftId}`).value;
+-    const notesVal = document.getElementById(`edit-notes-${shiftId}`).value;
+-    const station  = document.querySelector(`#edit-station-${shiftId} div[style*="rgba(0,166,251"]`)?.dataset.val;
++    const startVal  = document.getElementById(`edit-start-${shiftId}`).value;
++    const endVal    = document.getElementById(`edit-end-${shiftId}`).value;
++    const notesVal  = document.getElementById(`edit-notes-${shiftId}`).value;
++    const station   = document.querySelector(`#edit-station-${shiftId} div[style*="rgba(0,166,251"]`)?.dataset.val;
+     const shiftType = document.querySelector(`#edit-type-${shiftId} div[style*="rgba(0,166,251"]`)?.dataset.val;
+     const msg = document.getElementById(`edit-msg-${shiftId}`);
+ 
+-    // Convert local datetime-local value back to UTC ISO
+-    function localToISO(val) {
+-      if(!val) return null;
+-      // datetime-local is in Vienna time, convert to UTC
+-      const local = new Date(val);
+-      return local.toISOString();
+-    }
+-
+     const payload = { corrected_reason: 'Manuelle Korrektur' };
+-    if(startVal)   payload.work_start  = localToISO(startVal);
+-    if(endVal)     payload.work_end    = localToISO(endVal);
+-    if(station)    payload.station     = station;
+-    if(shiftType)  payload.shift_type  = shiftType;
++    if(startVal)   payload.work_start = localToUTC(startVal);
++    if(endVal)     payload.work_end   = localToUTC(endVal);
++    if(station)    payload.station    = station;
++    if(shiftType)  payload.shift_type = shiftType;
+     payload.notes = notesVal || null;
+ 
+     try {
+@@ -534,13 +556,133 @@
+       if(d.shift) {
+         msg.style.color = 'var(--green)';
+         msg.textContent = '✓ Gespeichert';
+-        setTimeout(() => {
+-          toggleEditForm(shiftId);
+-          loadShifts();
+-        }, 800);
++        setTimeout(() => { toggleEditForm(shiftId); loadShifts(); }, 800);
+       } else {
+         msg.style.color = 'var(--accent-red)';
+         msg.textContent = d.error || 'Fehler';
++      }
++    } catch(e) {
++      msg.style.color = 'var(--accent-red)';
+---DIFF_END: worktracker.html
+
+
+---
+COMPARE: worktracker_1.8 -> worktracker_1.8.1
+
+MODIFIED: worktracker.html
+---DIFF_START: worktracker.html
+--- Worktracker/worktracker_1.8/worktracker.html	2026-04-11 00:10:30
++++ Worktracker/worktracker_1.8.1/worktracker.html	2026-04-11 00:47:32
+@@ -100,6 +100,11 @@
+ .tab:hover:not(.active) { color: var(--text); }
+ .tab-section { display: none; } .tab-section.visible { display: block; }
+ 
++/* Prevent text selection on long press */
++.wt-shift-row, .wt-table tr {
++  -webkit-user-select: none;
++  user-select: none;
++}
+ /* Expand arrow */
+ .expand-arrow { font-size: 9px !important; }
+ 
+@@ -372,8 +377,8 @@
+ 
+       // Café Puls
+       if(data.cafe_puls) {
+-        html+=`<div style="font-family:'DM Mono',monospace;font-size:11px;margin-bottom:.75rem;display:flex;align-items:center;gap:6px">
+-          <span style="background:rgba(0,166,251,.1);border:1px solid rgba(0,166,251,.2);color:var(--accent-blue);padding:3px 8px;border-radius:4px;font-size:10px;letter-spacing:.06em">☕ CAFÉ PULS</span>
++        html+=`<div style="font-family:'DM Mono',monospace;font-size:11px;margin-bottom:.75rem">
++          <span style="background:rgba(0,166,251,.1);border:1px solid rgba(0,166,251,.2);color:var(--accent-blue);padding:3px 8px;border-radius:4px;font-size:10px;letter-spacing:.06em">CAFÉ PULS</span>
+         </div>`;
+       }
+ 
+@@ -461,8 +466,15 @@
+               `).join('')}
+             </div>
+           </div>
+-          <div style="margin-bottom:1rem">
+-            <div class="wt-label" style="margin-bottom:4px">Anmerkung</div>
++          <div style="margin-bottom:.75rem">
++            <div class="wt-label" style="margin-bottom:4px">Café Puls</div>
++            <div style="display:flex;gap:.4rem">
++              <div onclick="selectEditCafePuls('${shiftId}',true)" data-val="true"
++                style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.cafe_puls?'var(--accent-blue)':'var(--border)'};color:${data.cafe_puls?'var(--accent-blue)':'var(--muted)'};background:${data.cafe_puls?'rgba(0,166,251,.08)':'none'};cursor:pointer;transition:all .15s" id="cp-yes-${shiftId}">Ja</div>
++              <div onclick="selectEditCafePuls('${shiftId}',false)" data-val="false"
++                style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${!data.cafe_puls?'var(--accent-blue)':'var(--border)'};color:${!data.cafe_puls?'var(--accent-blue)':'var(--muted)'};background:${!data.cafe_puls?'rgba(0,166,251,.08)':'none'};cursor:pointer;transition:all .15s" id="cp-no-${shiftId}">Nein</div>
++            </div>
++          </div>
+             <input id="edit-notes-${shiftId}" type="text" value="${data.notes||''}" placeholder="Optional…"
+               style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;outline:none">
+           </div>
+@@ -516,6 +528,17 @@
+   function toggleEditForm(shiftId) {
+     const form = document.getElementById(`edit-${shiftId}`);
+     form.style.display = form.style.display === 'none' ? 'block' : 'none';
++  }
++
++  function selectEditCafePuls(shiftId, val) {
++    const yes = document.getElementById(`cp-yes-${shiftId}`);
++    const no  = document.getElementById(`cp-no-${shiftId}`);
++    [yes, no].forEach(el => {
++      const active = (el.id.includes('yes') && val) || (el.id.includes('no') && !val);
++      el.style.borderColor = active ? 'var(--accent-blue)' : 'var(--border)';
++      el.style.color       = active ? 'var(--accent-blue)' : 'var(--muted)';
++      el.style.background  = active ? 'rgba(0,166,251,.08)' : 'none';
++    });
+   }
+ 
+   function selectEditStation(shiftId, val) {
+@@ -550,6 +573,9 @@
+     if(station)    payload.station    = station;
+     if(shiftType)  payload.shift_type = shiftType;
+     payload.notes = notesVal || null;
++    // café puls
++    const cpYes = document.getElementById(`cp-yes-${shiftId}`);
++    if(cpYes) payload.cafe_puls = cpYes.style.background.includes('rgba');
+ 
+     try {
+       const d = await apiFetch(`/api/shift/${shiftId}/correct`, 'PATCH', payload);
+---DIFF_END: worktracker.html
+
+
+---
+COMPARE: worktracker_1.8.1 -> worktracker_1.8.2
+
+MODIFIED: worktracker.html
+---DIFF_START: worktracker.html
+--- Worktracker/worktracker_1.8.1/worktracker.html	2026-04-11 00:47:32
++++ Worktracker/worktracker_1.8.2/worktracker.html	2026-04-11 00:58:46
+@@ -432,59 +432,81 @@
+ 
+       container.innerHTML=html+`
+         <div class="wt-divider" style="margin:.75rem 0"></div>
+-        <button onclick="event.stopPropagation();toggleEditForm('${shiftId}')" style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:6px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--border-hover)'" onmouseout="this.style.borderColor='var(--border)'">Bearbeiten</button>
++        <button onclick="event.stopPropagation();toggleEditForm('${shiftId}')" id="edit-btn-${shiftId}"
++          style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:6px;cursor:pointer">Bearbeiten</button>
+ 
+         <div id="edit-${shiftId}" style="display:none;margin-top:1rem" onclick="event.stopPropagation()">
++
+           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem">
+             <div>
+-              <div class="wt-label" style="margin-bottom:4px">Beginn</div>
+-              <input id="edit-start-${shiftId}" type="datetime-local" value="${toLocalISO(data.work_start)}"
+-                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;outline:none;-webkit-appearance:none"
+-                onfocus="this.showPicker&&this.showPicker()">
++              <div class="wt-label" style="margin-bottom:4px">Beginn Datum</div>
++              <input id="edit-start-date-${shiftId}" type="date" value="${toLocalISO(data.work_start).split('T')[0]}"
++                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;outline:none">
+             </div>
+             <div>
+-              <div class="wt-label" style="margin-bottom:4px">Ende</div>
+-              <input id="edit-end-${shiftId}" type="datetime-local" value="${data.work_end?toLocalISO(data.work_end):''}"
+-                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;outline:none;-webkit-appearance:none">
++              <div class="wt-label" style="margin-bottom:4px">Beginn Zeit</div>
++              <input id="edit-start-time-${shiftId}" type="time" value="${toLocalISO(data.work_start).split('T')[1]}"
++                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none">
++            </div>
++          </div>
++
++          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem">
++            <div>
++              <div class="wt-label" style="margin-bottom:4px">Ende Datum</div>
++              <input id="edit-end-date-${shiftId}" type="date" value="${data.work_end?toLocalISO(data.work_end).split('T')[0]:''}"
++                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;outline:none">
+             </div>
++            <div>
++              <div class="wt-label" style="margin-bottom:4px">Ende Zeit</div>
++              <input id="edit-end-time-${shiftId}" type="time" value="${data.work_end?toLocalISO(data.work_end).split('T')[1]:''}"
++                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none">
++            </div>
+           </div>
++
+           <div style="margin-bottom:.75rem">
+             <div class="wt-label" style="margin-bottom:4px">Station</div>
+             <div style="display:flex;flex-wrap:wrap;gap:.4rem" id="edit-station-${shiftId}">
+               ${['Puls4','ATV','ATV2','Puls24'].map(s=>`
+-                <div onclick="selectEditStation('${shiftId}','${s}')" data-val="${s}"
++                <div onclick="event.stopPropagation();selectEditStation('${shiftId}','${s}')" data-val="${s}"
+                   style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.station===s?'var(--accent-blue)':'var(--border)'};color:${data.station===s?'var(--accent-blue)':'var(--muted)'};background:${data.station===s?'rgba(0,166,251,.08)':'none'};cursor:pointer;transition:all .15s">${s}</div>
+               `).join('')}
+             </div>
+           </div>
++
+           <div style="margin-bottom:.75rem">
+             <div class="wt-label" style="margin-bottom:4px">Schichttyp</div>
+             <div style="display:flex;gap:.4rem" id="edit-type-${shiftId}">
+               ${[['früh','Früh'],['nachmittag','Nachmittag'],['nacht','Nacht']].map(([v,l])=>`
+-                <div onclick="selectEditType('${shiftId}','${v}')" data-val="${v}"
++                <div onclick="event.stopPropagation();selectEditType('${shiftId}','${v}')" data-val="${v}"
+                   style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.shift_type===v?'var(--accent-blue)':'var(--border)'};color:${data.shift_type===v?'var(--accent-blue)':'var(--muted)'};background:${data.shift_type===v?'rgba(0,166,251,.08)':'none'};cursor:pointer;transition:all .15s">${l}</div>
+               `).join('')}
+             </div>
+           </div>
++
+           <div style="margin-bottom:.75rem">
+             <div class="wt-label" style="margin-bottom:4px">Café Puls</div>
+             <div style="display:flex;gap:.4rem">
+-              <div onclick="selectEditCafePuls('${shiftId}',true)" data-val="true"
+-                style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.cafe_puls?'var(--accent-blue)':'var(--border)'};color:${data.cafe_puls?'var(--accent-blue)':'var(--muted)'};background:${data.cafe_puls?'rgba(0,166,251,.08)':'none'};cursor:pointer;transition:all .15s" id="cp-yes-${shiftId}">Ja</div>
+-              <div onclick="selectEditCafePuls('${shiftId}',false)" data-val="false"
+-                style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${!data.cafe_puls?'var(--accent-blue)':'var(--border)'};color:${!data.cafe_puls?'var(--accent-blue)':'var(--muted)'};background:${!data.cafe_puls?'rgba(0,166,251,.08)':'none'};cursor:pointer;transition:all .15s" id="cp-no-${shiftId}">Nein</div>
++              <div onclick="event.stopPropagation();selectEditCafePuls('${shiftId}',true)" id="cp-yes-${shiftId}"
++                style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.cafe_puls?'var(--accent-blue)':'var(--border)'};color:${data.cafe_puls?'var(--accent-blue)':'var(--muted)'};background:${data.cafe_puls?'rgba(0,166,251,.08)':'none'};cursor:pointer;transition:all .15s">Ja</div>
++              <div onclick="event.stopPropagation();selectEditCafePuls('${shiftId}',false)" id="cp-no-${shiftId}"
++                style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${!data.cafe_puls?'var(--accent-blue)':'var(--border)'};color:${!data.cafe_puls?'var(--accent-blue)':'var(--muted)'};background:${!data.cafe_puls?'rgba(0,166,251,.08)':'none'};cursor:pointer;transition:all .15s">Nein</div>
+             </div>
+           </div>
++
++          <div style="margin-bottom:1rem">
++            <div class="wt-label" style="margin-bottom:4px">Anmerkung</div>
+             <input id="edit-notes-${shiftId}" type="text" value="${data.notes||''}" placeholder="Optional…"
+               style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;outline:none">
+           </div>
++
+           <div style="display:flex;gap:.5rem">
+-            <button onclick="saveEdit('${shiftId}')"
++            <button onclick="event.stopPropagation();saveEdit('${shiftId}')"
+               style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.06em;background:var(--green);color:#0a0a0b;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-weight:500">Speichern</button>
+-            <button onclick="toggleEditForm('${shiftId}')"
++            <button onclick="event.stopPropagation();toggleEditForm('${shiftId}')"
+               style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.06em;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 16px;cursor:pointer">Abbrechen</button>
+           </div>
+           <div id="edit-msg-${shiftId}" style="font-family:'DM Mono',monospace;font-size:11px;margin-top:.5rem"></div>
++
+         </div>`;
+     }catch(e){
+       document.getElementById(`detail-${shiftId}`).innerHTML=
+@@ -560,20 +582,21 @@
+   }
+ 
+   async function saveEdit(shiftId) {
+-    const startVal  = document.getElementById(`edit-start-${shiftId}`).value;
+-    const endVal    = document.getElementById(`edit-end-${shiftId}`).value;
+-    const notesVal  = document.getElementById(`edit-notes-${shiftId}`).value;
++    const startDate = document.getElementById(`edit-start-date-${shiftId}`)?.value;
++    const startTime = document.getElementById(`edit-start-time-${shiftId}`)?.value;
++    const endDate   = document.getElementById(`edit-end-date-${shiftId}`)?.value;
++    const endTime   = document.getElementById(`edit-end-time-${shiftId}`)?.value;
++    const notesVal  = document.getElementById(`edit-notes-${shiftId}`)?.value;
+     const station   = document.querySelector(`#edit-station-${shiftId} div[style*="rgba(0,166,251"]`)?.dataset.val;
+     const shiftType = document.querySelector(`#edit-type-${shiftId} div[style*="rgba(0,166,251"]`)?.dataset.val;
+     const msg = document.getElementById(`edit-msg-${shiftId}`);
+ 
+     const payload = { corrected_reason: 'Manuelle Korrektur' };
+-    if(startVal)   payload.work_start = localToUTC(startVal);
+-    if(endVal)     payload.work_end   = localToUTC(endVal);
++    if(startDate && startTime) payload.work_start = localToUTC(`${startDate}T${startTime}`);
+---DIFF_END: worktracker.html
+
+
+---
+COMPARE: worktracker_1.8.2 -> worktracker_1.8.3
+
+MODIFIED: worktracker.html
+---DIFF_START: worktracker.html
+--- Worktracker/worktracker_1.8.2/worktracker.html	2026-04-11 00:58:46
++++ Worktracker/worktracker_1.8.3/worktracker.html	2026-04-11 01:33:31
+@@ -200,8 +200,10 @@
+   function schichtTyp(t){return({'früh':'Frühdienst','nachmittag':'Nachmittagsdienst','nacht':'Nachtdienst'}[t]||t||'—')}
+ 
+   /* ── API ── */
+-  async function apiFetch(path){
+-    const r=await fetch(path);
++  async function apiFetch(path, method='GET', body=null){
++    const opts={method, headers:{'Content-Type':'application/json'}};
++    if(body) opts.body=JSON.stringify(body);
++    const r=await fetch(path, opts);
+     if(!r.ok) throw new Error(r.status+' '+r.statusText);
+     return r.json();
+   }
+@@ -445,8 +447,10 @@
+             </div>
+             <div>
+               <div class="wt-label" style="margin-bottom:4px">Beginn Zeit</div>
+-              <input id="edit-start-time-${shiftId}" type="time" value="${toLocalISO(data.work_start).split('T')[1]}"
+-                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none">
++              <input id="edit-start-time-${shiftId}" type="text" inputmode="numeric"
++                placeholder="HH:MM" maxlength="5" value="${toLocalISO(data.work_start).split('T')[1]}"
++                oninput="fmtTimeInput(this)"
++                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;letter-spacing:.05em">
+             </div>
+           </div>
+ 
+@@ -458,8 +462,10 @@
+             </div>
+             <div>
+               <div class="wt-label" style="margin-bottom:4px">Ende Zeit</div>
+-              <input id="edit-end-time-${shiftId}" type="time" value="${data.work_end?toLocalISO(data.work_end).split('T')[1]:''}"
+-                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none">
++              <input id="edit-end-time-${shiftId}" type="text" inputmode="numeric"
++                placeholder="HH:MM" maxlength="5" value="${data.work_end?toLocalISO(data.work_end).split('T')[1]:''}"
++                oninput="fmtTimeInput(this)"
++                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;letter-spacing:.05em">
+             </div>
+           </div>
+ 
+@@ -512,6 +518,13 @@
+       document.getElementById(`detail-${shiftId}`).innerHTML=
+         `<div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--accent-red)">Fehler: ${e.message}</div>`;
+     }
++  }
++
++  /* ── Time Input Auto-Format ── */
++  function fmtTimeInput(el) {
++    let v = el.value.replace(/[^0-9]/g, '');
++    if(v.length >= 3) v = v.slice(0,2) + ':' + v.slice(2,4);
++    el.value = v;
+   }
+ 
+   /* ── Edit Helpers ── */
+@@ -648,11 +661,15 @@
+         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem">
+           <div>
+             <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Von</div>
+-            <input id="be-start" type="time" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none">
++            <input id="be-start" type="text" inputmode="numeric" placeholder="HH:MM" maxlength="5"
++              oninput="fmtTimeInput(this)"
++              style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;letter-spacing:.05em">
+           </div>
+           <div>
+             <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Bis</div>
+-            <input id="be-end" type="time" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none">
++            <input id="be-end" type="text" inputmode="numeric" placeholder="HH:MM" maxlength="5"
++              oninput="fmtTimeInput(this)"
++              style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;letter-spacing:.05em">
+           </div>
+         </div>
+         <div style="margin-bottom:.75rem">
+---DIFF_END: worktracker.html
+
+
+---
+COMPARE: worktracker_1.8.3 -> worktracker_1.9
+
+ADDED: patch_soft_delete.py
+MODIFIED: worktracker.html
+---DIFF_START: worktracker.html
+--- Worktracker/worktracker_1.8.3/worktracker.html	2026-04-11 01:33:31
++++ Worktracker/worktracker_1.9/worktracker.html	2026-04-10 23:44:38
+@@ -447,10 +447,8 @@
+             </div>
+             <div>
+               <div class="wt-label" style="margin-bottom:4px">Beginn Zeit</div>
+-              <input id="edit-start-time-${shiftId}" type="text" inputmode="numeric"
+-                placeholder="HH:MM" maxlength="5" value="${toLocalISO(data.work_start).split('T')[1]}"
+-                oninput="fmtTimeInput(this)"
+-                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;letter-spacing:.05em">
++              <input id="edit-start-time-${shiftId}" type="time" value="${toLocalISO(data.work_start).split('T')[1]}"
++                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none">
+             </div>
+           </div>
+ 
+@@ -462,10 +460,8 @@
+             </div>
+             <div>
+               <div class="wt-label" style="margin-bottom:4px">Ende Zeit</div>
+-              <input id="edit-end-time-${shiftId}" type="text" inputmode="numeric"
+-                placeholder="HH:MM" maxlength="5" value="${data.work_end?toLocalISO(data.work_end).split('T')[1]:''}"
+-                oninput="fmtTimeInput(this)"
+-                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;letter-spacing:.05em">
++              <input id="edit-end-time-${shiftId}" type="time" value="${data.work_end?toLocalISO(data.work_end).split('T')[1]:''}"
++                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none">
+             </div>
+           </div>
+ 
+@@ -505,11 +501,13 @@
+               style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;outline:none">
+           </div>
+ 
+-          <div style="display:flex;gap:.5rem">
++          <div style="display:flex;gap:.5rem;margin-top:.5rem">
+             <button onclick="event.stopPropagation();saveEdit('${shiftId}')"
+               style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.06em;background:var(--green);color:#0a0a0b;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-weight:500">Speichern</button>
+             <button onclick="event.stopPropagation();toggleEditForm('${shiftId}')"
+               style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.06em;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 16px;cursor:pointer">Abbrechen</button>
++            <button onclick="event.stopPropagation();deleteShift('${shiftId}')"
++              style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.06em;background:none;border:1px solid rgba(255,0,81,.3);color:var(--accent-red);border-radius:8px;padding:8px 16px;cursor:pointer;margin-left:auto">Löschen</button>
+           </div>
+           <div id="edit-msg-${shiftId}" style="font-family:'DM Mono',monospace;font-size:11px;margin-top:.5rem"></div>
+ 
+@@ -661,15 +659,13 @@
+         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem">
+           <div>
+             <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Von</div>
+-            <input id="be-start" type="text" inputmode="numeric" placeholder="HH:MM" maxlength="5"
+-              oninput="fmtTimeInput(this)"
+-              style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;letter-spacing:.05em">
++            <input id="be-start" type="time"
++              style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none">
+           </div>
+           <div>
+             <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Bis</div>
+-            <input id="be-end" type="text" inputmode="numeric" placeholder="HH:MM" maxlength="5"
+-              oninput="fmtTimeInput(this)"
+-              style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;letter-spacing:.05em">
++            <input id="be-end" type="time"
++              style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none">
+           </div>
+         </div>
+         <div style="margin-bottom:.75rem">
+@@ -695,6 +691,7 @@
+         <div style="display:flex;gap:.5rem">
+           <button onclick="saveBreakEdit('${breakId}','${shiftId}')" style="flex:1;font-family:'DM Mono',monospace;font-size:11px;background:var(--green);color:#0a0a0b;border:none;border-radius:8px;padding:10px;cursor:pointer;font-weight:500">Speichern</button>
+           <button onclick="document.getElementById('break-edit-overlay').remove()" style="font-family:'DM Mono',monospace;font-size:11px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:10px 16px;cursor:pointer">Abbrechen</button>
++          <button onclick="deleteBreak('${breakId}','${shiftId}')" style="font-family:'DM Mono',monospace;font-size:11px;background:none;border:1px solid rgba(255,0,81,.3);color:var(--accent-red);border-radius:8px;padding:10px 14px;cursor:pointer">Löschen</button>
+         </div>
+         <div id="be-msg" style="font-family:'DM Mono',monospace;font-size:11px;margin-top:.5rem;text-align:center"></div>
+       </div>`;
+@@ -756,6 +753,31 @@
+     }
+   }
+ 
++  async function deleteShift(shiftId) {
++    if(!confirm('Schicht wirklich löschen?')) return;
++    try {
++      const d = await apiFetch(`/api/shift/${shiftId}`, 'DELETE');
++      if(d.status === 'deleted') {
++        loadShifts();
++      }
++    } catch(e) {
++      alert('Fehler: ' + e.message);
++    }
++  }
++
++  async function deleteBreak(breakId, shiftId) {
++    if(!confirm('Pause wirklich löschen?')) return;
++    try {
++      const d = await apiFetch(`/api/break/${breakId}`, 'DELETE');
++      if(d.status === 'deleted') {
++        document.getElementById('break-edit-overlay')?.remove();
++        loadShifts();
++      }
++    } catch(e) {
++      alert('Fehler: ' + e.message);
++    }
++  }
++
+   /* ── Load ── */
+   async function loadActive(){
+     try{
+---DIFF_END: worktracker.html
+
+
+---
+COMPARE: worktracker_1.9 -> worktracker_1.9.1
+
+MODIFIED: worktracker.html
+---DIFF_START: worktracker.html
+--- Worktracker/worktracker_1.9/worktracker.html	2026-04-10 23:44:38
++++ Worktracker/worktracker_1.9.1/worktracker.html	2026-04-11 01:57:55
+@@ -325,6 +325,7 @@
+ 
+       const el=document.createElement('div');
+       el.className='wt-shift-row';
++      el.dataset.shiftId = s.id;
+       el.style.cssText='opacity:0;transform:translateY(12px);transition:opacity .5s ease,transform .5s ease';
+ 
+       el.innerHTML=`
+@@ -506,7 +507,7 @@
+               style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.06em;background:var(--green);color:#0a0a0b;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-weight:500">Speichern</button>
+             <button onclick="event.stopPropagation();toggleEditForm('${shiftId}')"
+               style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.06em;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 16px;cursor:pointer">Abbrechen</button>
+-            <button onclick="event.stopPropagation();deleteShift('${shiftId}')"
++            <button onclick="event.stopPropagation();deleteShift('${shiftId}',event)"
+               style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.06em;background:none;border:1px solid rgba(255,0,81,.3);color:var(--accent-red);border-radius:8px;padding:8px 16px;cursor:pointer;margin-left:auto">Löschen</button>
+           </div>
+           <div id="edit-msg-${shiftId}" style="font-family:'DM Mono',monospace;font-size:11px;margin-top:.5rem"></div>
+@@ -691,7 +692,7 @@
+         <div style="display:flex;gap:.5rem">
+           <button onclick="saveBreakEdit('${breakId}','${shiftId}')" style="flex:1;font-family:'DM Mono',monospace;font-size:11px;background:var(--green);color:#0a0a0b;border:none;border-radius:8px;padding:10px;cursor:pointer;font-weight:500">Speichern</button>
+           <button onclick="document.getElementById('break-edit-overlay').remove()" style="font-family:'DM Mono',monospace;font-size:11px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:10px 16px;cursor:pointer">Abbrechen</button>
+-          <button onclick="deleteBreak('${breakId}','${shiftId}')" style="font-family:'DM Mono',monospace;font-size:11px;background:none;border:1px solid rgba(255,0,81,.3);color:var(--accent-red);border-radius:8px;padding:10px 14px;cursor:pointer">Löschen</button>
++          <button onclick="deleteBreak('${breakId}','${shiftId}',event)" style="font-family:'DM Mono',monospace;font-size:11px;background:none;border:1px solid rgba(255,0,81,.3);color:var(--accent-red);border-radius:8px;padding:10px 14px;cursor:pointer">Löschen</button>
+         </div>
+         <div id="be-msg" style="font-family:'DM Mono',monospace;font-size:11px;margin-top:.5rem;text-align:center"></div>
+       </div>`;
+@@ -753,25 +754,36 @@
+     }
+   }
+ 
+-  async function deleteShift(shiftId) {
++  async function deleteShift(shiftId, event) {
++    event.stopPropagation();
+     if(!confirm('Schicht wirklich löschen?')) return;
+     try {
+       const d = await apiFetch(`/api/shift/${shiftId}`, 'DELETE');
+       if(d.status === 'deleted') {
+-        loadShifts();
++        // Remove the row from DOM directly
++        const row = document.querySelector(`[data-shift-id="${shiftId}"]`);
++        if(row) row.remove();
++        else loadShifts();
+       }
+     } catch(e) {
+       alert('Fehler: ' + e.message);
+     }
+   }
+ 
+-  async function deleteBreak(breakId, shiftId) {
++  async function deleteBreak(breakId, shiftId, event) {
++    event.stopPropagation();
+     if(!confirm('Pause wirklich löschen?')) return;
+     try {
+       const d = await apiFetch(`/api/break/${breakId}`, 'DELETE');
+       if(d.status === 'deleted') {
+         document.getElementById('break-edit-overlay')?.remove();
+-        loadShifts();
++        // Reload the shift detail
++        const detailContainer = document.getElementById(`detail-${shiftId}`);
++        if(detailContainer) {
++          detailContainer.innerHTML = '<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted);text-align:center;padding:.5rem">Laden…</div>';
++          toggleShiftDetail(detailContainer.closest('.wt-shift-row'), shiftId);
++          toggleShiftDetail(detailContainer.closest('.wt-shift-row'), shiftId);
++        }
+       }
+     } catch(e) {
+       alert('Fehler: ' + e.message);
+---DIFF_END: worktracker.html
+
+REMOVED: patch_soft_delete.py
+
+---
+COMPARE: worktracker_1.9.1 -> worktracker_1.9.2
+
+MODIFIED: worktracker.html
+---DIFF_START: worktracker.html
+--- Worktracker/worktracker_1.9.1/worktracker.html	2026-04-11 01:57:55
++++ Worktracker/worktracker_1.9.2/worktracker.html	2026-04-11 02:15:04
+@@ -605,7 +605,16 @@
+ 
+     const payload = { corrected_reason: 'Manuelle Korrektur' };
+     if(startDate && startTime) payload.work_start = localToUTC(`${startDate}T${startTime}`);
+-    if(endDate && endTime)     payload.work_end   = localToUTC(`${endDate}T${endTime}`);
++    if(endDate && endTime) {
++      // Auto-fix overnight: if end time < start time, end date = start date + 1
++      let resolvedEndDate = endDate;
++      if(startTime && endTime && endTime < startTime && startDate === endDate) {
++        const d = new Date(endDate);
++        d.setDate(d.getDate() + 1);
++        resolvedEndDate = d.toISOString().split('T')[0];
++      }
++      payload.work_end = localToUTC(`${resolvedEndDate}T${endTime}`);
++    }
+     if(station)    payload.station    = station;
+     if(shiftType)  payload.shift_type = shiftType;
+     payload.notes = notesVal || null;
+---DIFF_END: worktracker.html
+
+
+---
+COMPARE: worktracker_1.9.2 -> worktracker_2.0
+
+ADDED: patch_break_add.py
+MODIFIED: worktracker.html
+---DIFF_START: worktracker.html
+--- Worktracker/worktracker_1.9.2/worktracker.html	2026-04-11 02:15:04
++++ Worktracker/worktracker_2.0/worktracker.html	2026-04-11 00:19:52
+@@ -435,8 +435,12 @@
+ 
+       container.innerHTML=html+`
+         <div class="wt-divider" style="margin:.75rem 0"></div>
+-        <button onclick="event.stopPropagation();toggleEditForm('${shiftId}')" id="edit-btn-${shiftId}"
+-          style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:6px;cursor:pointer">Bearbeiten</button>
++        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
++          <button onclick="event.stopPropagation();toggleEditForm('${shiftId}')" id="edit-btn-${shiftId}"
++            style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:6px;cursor:pointer">Bearbeiten</button>
++          <button onclick="event.stopPropagation();openAddBreak('${shiftId}','${toLocalISO(data.work_start).split('T')[0]}')"
++            style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:none;border:1px solid rgba(74,222,128,.3);color:var(--green);padding:6px 12px;border-radius:6px;cursor:pointer">+ Pause</button>
++        </div>
+ 
+         <div id="edit-${shiftId}" style="display:none;margin-top:1rem" onclick="event.stopPropagation()">
+ 
+@@ -634,7 +638,139 @@
+     } catch(e) {
+       msg.style.color = 'var(--accent-red)';
+       msg.textContent = 'Verbindungsfehler: ' + e.message;
++    }
++  }
++
++  /* ── Add Break ── */
++  function openAddBreak(shiftId, baseDate) {
++    document.getElementById('break-edit-overlay')?.remove();
++
++    const overlay = document.createElement('div');
++    overlay.id = 'break-edit-overlay';
++    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:flex-end;justify-content:center;';
++    overlay.innerHTML = `
++      <div onclick="event.stopPropagation()" style="background:#161616;border:1px solid rgba(255,255,255,.12);border-radius:16px 16px 0 0;padding:1.5rem 1.25rem 2rem;width:100%;max-width:480px;">
++        <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem">Pause hinzufügen</div>
++
++        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem">
++          <div>
++            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Von</div>
++            <input id="ab-start" type="time" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none">
++          </div>
++          <div>
++            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Bis</div>
++            <input id="ab-end" type="time" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none">
++          </div>
++        </div>
++
++        <div style="margin-bottom:.75rem">
++          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Typ</div>
++          <div style="display:flex;flex-wrap:wrap;gap:.4rem" id="ab-types">
++            ${['Rauchen','WC','Einkaufen','Essen','Sonstiges'].map(t=>`
++              <div onclick="toggleAbType(this,'${t}')" data-val="${t}"
++                style="font-family:'DM Mono',monospace;font-size:11px;padding:5px 11px;border-radius:6px;border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:all .15s">${t}</div>
++            `).join('')}
++          </div>
++        </div>
++
++        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem">
++          <div>
++            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Spicy</div>
++            <div style="display:flex;align-items:center;gap:.5rem;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px">
++              <button onclick="adjustAB('spicy',-1)" style="width:28px;height:28px;border-radius:5px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);font-size:1rem;cursor:pointer">−</button>
++              <span id="ab-spicy" style="font-family:'DM Mono',monospace;font-size:1.1rem;flex:1;text-align:center">0</span>
++              <button onclick="adjustAB('spicy',1)" style="width:28px;height:28px;border-radius:5px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);font-size:1rem;cursor:pointer">+</button>
++            </div>
++          </div>
++          <div>
++            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Blend</div>
++            <div style="display:flex;align-items:center;gap:.5rem;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px">
++              <button onclick="adjustAB('blend',-1)" style="width:28px;height:28px;border-radius:5px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);font-size:1rem;cursor:pointer">−</button>
++              <span id="ab-blend" style="font-family:'DM Mono',monospace;font-size:1.1rem;flex:1;text-align:center">0</span>
++              <button onclick="adjustAB('blend',1)" style="width:28px;height:28px;border-radius:5px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);font-size:1rem;cursor:pointer">+</button>
++            </div>
++          </div>
++        </div>
++
++        <div style="margin-bottom:1rem">
++          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Notiz</div>
++          <input id="ab-notes" type="text" placeholder="Optional…" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none">
++        </div>
++
++        <div style="display:flex;gap:.5rem">
++          <button onclick="submitAddBreak('${shiftId}','${baseDate}')" style="flex:1;font-family:'DM Mono',monospace;font-size:11px;background:var(--green);color:#0a0a0b;border:none;border-radius:8px;padding:10px;cursor:pointer;font-weight:500">Hinzufügen</button>
++          <button onclick="document.getElementById('break-edit-overlay').remove()" style="font-family:'DM Mono',monospace;font-size:11px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:10px 16px;cursor:pointer">Abbrechen</button>
++        </div>
++        <div id="ab-msg" style="font-family:'DM Mono',monospace;font-size:11px;margin-top:.5rem;text-align:center"></div>
++      </div>`;
++
++    overlay.addEventListener('click', () => overlay.remove());
++    document.body.appendChild(overlay);
++  }
++
++  function toggleAbType(el, val) {
++    const active = el.style.borderColor.includes('251');
++    el.style.borderColor = active ? 'var(--border)' : 'var(--accent-blue)';
++    el.style.color = active ? 'var(--muted)' : 'var(--accent-blue)';
++    el.style.background = active ? 'none' : 'rgba(0,166,251,.08)';
++  }
++
++  function adjustAB(type, delta) {
++    const el = document.getElementById(`ab-${type}`);
++    el.textContent = Math.max(0, parseInt(el.textContent) + delta);
++  }
++
++  async function submitAddBreak(shiftId, baseDate) {
++    const startTime = document.getElementById('ab-start').value;
++    const endTime   = document.getElementById('ab-end').value;
++    const spicy     = parseInt(document.getElementById('ab-spicy').textContent) || 0;
++    const blend     = parseInt(document.getElementById('ab-blend').textContent) || 0;
++    const notes     = document.getElementById('ab-notes').value || null;
++    const msg       = document.getElementById('ab-msg');
++
++    if(!startTime) { msg.style.color='var(--accent-red)'; msg.textContent='Bitte Startzeit angeben'; return; }
++
++    const selectedTypes = [...document.querySelectorAll('#ab-types div')]
++      .filter(el => el.style.borderColor.includes('251'))
++      .map(el => el.dataset.val);
++    const breakType = selectedTypes.length > 0 ? selectedTypes.join(' + ') : 'Pause';
++
++    // Handle overnight: if end < start, end is next day
++    let endDate = baseDate;
+---DIFF_END: worktracker.html
+
+
+---
+COMPARE: worktracker_2.0 -> worktracker_2.0.1
+
+MODIFIED: worktracker.html
+---DIFF_START: worktracker.html
+--- Worktracker/worktracker_2.0/worktracker.html	2026-04-11 00:19:52
++++ Worktracker/worktracker_2.0.1/worktracker.html	2026-04-11 02:36:27
+@@ -316,17 +316,32 @@
+     const list=document.getElementById('shiftsList');
+     if(!shifts||shifts.length===0){list.innerHTML='<div class="state-msg">Noch keine Schichten vorhanden.</div>';return;}
+     list.innerHTML='';
++
++    // Shift type colors: früh=yellow, nachmittag=orange, nacht=blue
++    const shiftColors = {
++      'früh':       'rgba(250,204,21,0.08)',
++      'nachmittag': 'rgba(232,114,74,0.08)',
++      'nacht':      'rgba(0,166,251,0.08)'
++    };
++    const shiftBorders = {
++      'früh':       'rgba(250,204,21,0.35)',
++      'nachmittag': 'rgba(232,114,74,0.35)',
++      'nacht':      'rgba(0,166,251,0.35)'
++    };
++
+     shifts.forEach((s,i)=>{
+       const isActive=!s.work_end;
+       const grossMin=s.work_end?Math.round((new Date(s.work_end)-new Date(s.work_start))/60000):null;
+       const nettoMin=grossMin!==null?grossMin-(s.total_break_minutes||0):null;
+       const cigTotal=s.zig_total||0;
+       const stationLabel=s.station+(s.duo_partner_station?` · ${s.duo_partner_station}`:'');
++      const bgColor = shiftColors[s.shift_type] || 'transparent';
++      const borderColor = shiftBorders[s.shift_type] || 'var(--border)';
+ 
+       const el=document.createElement('div');
+       el.className='wt-shift-row';
+       el.dataset.shiftId = s.id;
+-      el.style.cssText='opacity:0;transform:translateY(12px);transition:opacity .5s ease,transform .5s ease';
++      el.style.cssText=`opacity:0;transform:translateY(12px);transition:opacity .5s ease,transform .5s ease;border-left:2px solid ${borderColor};background:linear-gradient(135deg,${bgColor} 0%,transparent 60%)`;
+ 
+       el.innerHTML=`
+         <div class="wt-shift-dot ${isActive?'active':''}"></div>
+@@ -440,7 +455,6 @@
+             style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:6px;cursor:pointer">Bearbeiten</button>
+           <button onclick="event.stopPropagation();openAddBreak('${shiftId}','${toLocalISO(data.work_start).split('T')[0]}')"
+             style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:none;border:1px solid rgba(74,222,128,.3);color:var(--green);padding:6px 12px;border-radius:6px;cursor:pointer">+ Pause</button>
+-        </div>
+ 
+         <div id="edit-${shiftId}" style="display:none;margin-top:1rem" onclick="event.stopPropagation()">
+ 
+@@ -461,8 +475,7 @@
+             <div>
+               <div class="wt-label" style="margin-bottom:4px">Ende Datum</div>
+               <input id="edit-end-date-${shiftId}" type="date" value="${data.work_end?toLocalISO(data.work_end).split('T')[0]:''}"
+-                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;outline:none">
+-            </div>
++                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;outline:none">            </div>
+             <div>
+               <div class="wt-label" style="margin-bottom:4px">Ende Zeit</div>
+               <input id="edit-end-time-${shiftId}" type="time" value="${data.work_end?toLocalISO(data.work_end).split('T')[1]:''}"
+@@ -652,6 +665,12 @@
+       <div onclick="event.stopPropagation()" style="background:#161616;border:1px solid rgba(255,255,255,.12);border-radius:16px 16px 0 0;padding:1.5rem 1.25rem 2rem;width:100%;max-width:480px;">
+         <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem">Pause hinzufügen</div>
+ 
++        <div style="margin-bottom:.75rem">
++          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Datum</div>
++          <input id="ab-date" type="date" value="${baseDate}"
++            style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;outline:none">
++        </div>
++
+         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem">
+           <div>
+             <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Von</div>
+@@ -720,7 +739,8 @@
+     el.textContent = Math.max(0, parseInt(el.textContent) + delta);
+   }
+ 
+-  async function submitAddBreak(shiftId, baseDate) {
++  async function submitAddBreak(shiftId, baseDateFallback) {
++    const baseDate  = document.getElementById('ab-date')?.value || baseDateFallback;
+     const startTime = document.getElementById('ab-start').value;
+     const endTime   = document.getElementById('ab-end').value;
+     const spicy     = parseInt(document.getElementById('ab-spicy').textContent) || 0;
+---DIFF_END: worktracker.html
+
+REMOVED: patch_break_add.py
+
+---
+COMPARE: worktracker_2.0.1 -> worktracker_2.0.2
+
+MODIFIED: worktracker.html
+---DIFF_START: worktracker.html
+--- Worktracker/worktracker_2.0.1/worktracker.html	2026-04-11 02:36:27
++++ Worktracker/worktracker_2.0.2/worktracker.html	2026-04-11 02:44:41
+@@ -341,7 +341,8 @@
+       const el=document.createElement('div');
+       el.className='wt-shift-row';
+       el.dataset.shiftId = s.id;
+-      el.style.cssText=`opacity:0;transform:translateY(12px);transition:opacity .5s ease,transform .5s ease;border-left:2px solid ${borderColor};background:linear-gradient(135deg,${bgColor} 0%,transparent 60%)`;
++      // Background: dark surface with color fade from left, solid dark on right
++      el.style.cssText=`opacity:0;transform:translateY(12px);transition:opacity .5s ease,transform .5s ease;border-color:${borderColor};background:linear-gradient(to right,${bgColor},var(--surface) 70%)`;
+ 
+       el.innerHTML=`
+         <div class="wt-shift-dot ${isActive?'active':''}"></div>
+@@ -450,13 +451,14 @@
+ 
+       container.innerHTML=html+`
+         <div class="wt-divider" style="margin:.75rem 0"></div>
+-        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
++        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.75rem">
+           <button onclick="event.stopPropagation();toggleEditForm('${shiftId}')" id="edit-btn-${shiftId}"
+             style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:6px;cursor:pointer">Bearbeiten</button>
+           <button onclick="event.stopPropagation();openAddBreak('${shiftId}','${toLocalISO(data.work_start).split('T')[0]}')"
+             style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:none;border:1px solid rgba(74,222,128,.3);color:var(--green);padding:6px 12px;border-radius:6px;cursor:pointer">+ Pause</button>
++        </div>
+ 
+-        <div id="edit-${shiftId}" style="display:none;margin-top:1rem" onclick="event.stopPropagation()">
++        <div id="edit-${shiftId}" style="display:none;margin-top:.5rem" onclick="event.stopPropagation()">
+ 
+           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem">
+             <div>
+@@ -475,7 +477,8 @@
+             <div>
+               <div class="wt-label" style="margin-bottom:4px">Ende Datum</div>
+               <input id="edit-end-date-${shiftId}" type="date" value="${data.work_end?toLocalISO(data.work_end).split('T')[0]:''}"
+-                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;outline:none">            </div>
++                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;outline:none">
++            </div>
+             <div>
+               <div class="wt-label" style="margin-bottom:4px">Ende Zeit</div>
+               <input id="edit-end-time-${shiftId}" type="time" value="${data.work_end?toLocalISO(data.work_end).split('T')[1]:''}"
+---DIFF_END: worktracker.html
+
+
+---
+COMPARE: worktracker_2.0.2 -> worktracker_2.0.3
+
+MODIFIED: worktracker.html
+---DIFF_START: worktracker.html
+--- Worktracker/worktracker_2.0.2/worktracker.html	2026-04-11 02:44:41
++++ Worktracker/worktracker_2.0.3/worktracker.html	2026-04-11 03:04:19
+@@ -99,6 +99,25 @@
+ .tab.active { color: var(--text); border-bottom-color: var(--text); }
+ .tab:hover:not(.active) { color: var(--text); }
+ .tab-section { display: none; } .tab-section.visible { display: block; }
++
++/* ── Shift Row Gradient (color → transparent overlay over dark surface) ── */
++:root { --orange: #F96F5D; }
++.wt-shift-row {
++  position: relative;
++  overflow: hidden;
++}
++.wt-shift-row::before {
++  content: '';
++  position: absolute;
++  inset: 0;
++  border-radius: inherit;
++  pointer-events: none;
++  z-index: 0;
++}
++.wt-shift-row > * { position: relative; z-index: 1; }
++.wt-shift-row.typ-frueh::before       { background: linear-gradient(to right, rgba(250,180,0,.22), transparent 70%); }
++.wt-shift-row.typ-nachmittag::before  { background: linear-gradient(to right, rgba(249,111,93,.22), transparent 70%); }
++.wt-shift-row.typ-nacht::before       { background: linear-gradient(to right, rgba(0,166,251,.22), transparent 70%); }
+ 
+ /* Prevent text selection on long press */
+ .wt-shift-row, .wt-table tr {
+@@ -335,14 +354,13 @@
+       const nettoMin=grossMin!==null?grossMin-(s.total_break_minutes||0):null;
+       const cigTotal=s.zig_total||0;
+       const stationLabel=s.station+(s.duo_partner_station?` · ${s.duo_partner_station}`:'');
+-      const bgColor = shiftColors[s.shift_type] || 'transparent';
+       const borderColor = shiftBorders[s.shift_type] || 'var(--border)';
++      const typClass = {'früh':'typ-frueh','nachmittag':'typ-nachmittag','nacht':'typ-nacht'}[s.shift_type] || '';
+ 
+       const el=document.createElement('div');
+-      el.className='wt-shift-row';
++      el.className='wt-shift-row ' + typClass;
+       el.dataset.shiftId = s.id;
+-      // Background: dark surface with color fade from left, solid dark on right
+-      el.style.cssText=`opacity:0;transform:translateY(12px);transition:opacity .5s ease,transform .5s ease;border-color:${borderColor};background:linear-gradient(to right,${bgColor},var(--surface) 70%)`;
++      el.style.cssText=`opacity:0;transform:translateY(12px);transition:opacity .5s ease,transform .5s ease;border-color:${borderColor};background:var(--surface)`;
+ 
+       el.innerHTML=`
+         <div class="wt-shift-dot ${isActive?'active':''}"></div>
+---DIFF_END: worktracker.html
+
+
+---
+COMPARE: worktracker_2.0.3 -> worktracker_2.0.4
+
+MODIFIED: worktracker.html
+---DIFF_START: worktracker.html
+--- Worktracker/worktracker_2.0.3/worktracker.html	2026-04-11 03:04:19
++++ Worktracker/worktracker_2.0.4/worktracker.html	2026-04-11 03:12:43
+@@ -100,24 +100,30 @@
+ .tab:hover:not(.active) { color: var(--text); }
+ .tab-section { display: none; } .tab-section.visible { display: block; }
+ 
+-/* ── Shift Row Gradient (color → transparent overlay over dark surface) ── */
++/* ── Shift Row Color Badge ── */
+ :root { --orange: #F96F5D; }
+ .wt-shift-row {
+   position: relative;
+   overflow: hidden;
+ }
++/* Left color bar — 3px, full height, sits inside border-radius */
+ .wt-shift-row::before {
+   content: '';
+   position: absolute;
+-  inset: 0;
+-  border-radius: inherit;
++  left: 0;
++  top: 0;
++  bottom: 0;
++  width: 3px;
++  border-radius: 3px 0 0 3px;
+   pointer-events: none;
+-  z-index: 0;
++  z-index: 2;
+ }
+ .wt-shift-row > * { position: relative; z-index: 1; }
+-.wt-shift-row.typ-frueh::before       { background: linear-gradient(to right, rgba(250,180,0,.22), transparent 70%); }
+-.wt-shift-row.typ-nachmittag::before  { background: linear-gradient(to right, rgba(249,111,93,.22), transparent 70%); }
+-.wt-shift-row.typ-nacht::before       { background: linear-gradient(to right, rgba(0,166,251,.22), transparent 70%); }
++/* Extra left padding so content clears the color bar */
++.wt-shift-row { padding-left: 1.75rem; }
++.wt-shift-row.typ-frueh::before      { background: #FFB400; box-shadow: 0 0 8px 1px rgba(255,180,0,.45); }
++.wt-shift-row.typ-nachmittag::before { background: #F96F5D; box-shadow: 0 0 8px 1px rgba(249,111,93,.45); }
++.wt-shift-row.typ-nacht::before      { background: #00A6FB; box-shadow: 0 0 8px 1px rgba(0,166,251,.45); }
+ 
+ /* Prevent text selection on long press */
+ .wt-shift-row, .wt-table tr {
+---DIFF_END: worktracker.html
+
+
+---
+COMPARE: worktracker_2.0.4 -> worktracker_2.0.5
+
+MODIFIED: worktracker.html
+---DIFF_START: worktracker.html
+--- Worktracker/worktracker_2.0.4/worktracker.html	2026-04-11 03:12:43
++++ Worktracker/worktracker_2.0.5/worktracker.html	2026-04-11 03:34:29
+@@ -15,6 +15,9 @@
+ <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;700;800&display=swap" rel="stylesheet">
+ <link rel="stylesheet" href="/shared/bensn.css">
+ <style>
++/* ── Color overrides ── */
++:root { --orange: #FF0051; --accent-blue: #00A6ED; }
++
+ /* ── App Layout ── */
+ body { overscroll-behavior: none; }
+ .app-wrap {
+@@ -81,49 +84,52 @@
+ }
+ 
+ /* ── Tabs ── */
+-.tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
+-.tab {
++.tab-section { display: none; } .tab-section.visible { display: block; }
++
++/* ── Bottom Tab Bar ── */
++.bottom-bar {
++  position: fixed;
++  bottom: 0;
++  left: 0;
++  right: 0;
++  z-index: 50;
++  background: rgba(10,10,11,0.92);
++  backdrop-filter: blur(16px);
++  -webkit-backdrop-filter: blur(16px);
++  border-top: 1px solid var(--border);
++  display: flex;
++  align-items: stretch;
++  max-width: 800px;
++  margin: 0 auto;
++  padding-bottom: env(safe-area-inset-bottom, 0px);
++}
++/* Center the bar on wide screens */
++@media (min-width: 800px) {
++  .bottom-bar { left: 50%; right: auto; transform: translateX(-50%); width: 800px; }
++}
++.bottom-tab {
++  flex: 1;
+   font-family: 'DM Mono', monospace;
+   font-size: 11px;
+   text-transform: uppercase;
+   letter-spacing: .1em;
+-  padding: 9px 14px;
++  padding: 14px 0 12px;
+   cursor: pointer;
+   color: var(--muted);
+   border: none;
+-  border-bottom: 2px solid transparent;
+-  margin-bottom: -1px;
+   background: none;
+-  transition: color .15s, border-color .15s;
++  text-align: center;
++  transition: color .15s;
++  text-decoration: none;
++  display: flex;
++  align-items: center;
++  justify-content: center;
+ }
+-.tab.active { color: var(--text); border-bottom-color: var(--text); }
+-.tab:hover:not(.active) { color: var(--text); }
+-.tab-section { display: none; } .tab-section.visible { display: block; }
+-
+-/* ── Shift Row Color Badge ── */
+-:root { --orange: #F96F5D; }
+-.wt-shift-row {
+-  position: relative;
+-  overflow: hidden;
+-}
+-/* Left color bar — 3px, full height, sits inside border-radius */
+-.wt-shift-row::before {
+-  content: '';
+-  position: absolute;
+-  left: 0;
+-  top: 0;
+-  bottom: 0;
+-  width: 3px;
+-  border-radius: 3px 0 0 3px;
+-  pointer-events: none;
+-  z-index: 2;
+-}
+-.wt-shift-row > * { position: relative; z-index: 1; }
+-/* Extra left padding so content clears the color bar */
+-.wt-shift-row { padding-left: 1.75rem; }
+-.wt-shift-row.typ-frueh::before      { background: #FFB400; box-shadow: 0 0 8px 1px rgba(255,180,0,.45); }
+-.wt-shift-row.typ-nachmittag::before { background: #F96F5D; box-shadow: 0 0 8px 1px rgba(249,111,93,.45); }
+-.wt-shift-row.typ-nacht::before      { background: #00A6FB; box-shadow: 0 0 8px 1px rgba(0,166,251,.45); }
++.bottom-tab.active { color: var(--text); }
++.bottom-tab:hover:not(.active) { color: var(--text); }
++.bottom-tab-eingabe { color: var(--accent-blue) !important; }
++/* Spacer so content doesn't hide behind bottom bar */
++.bottom-bar-spacer { height: 80px; }
+ 
+ /* Prevent text selection on long press */
+ .wt-shift-row, .wt-table tr {
+@@ -163,12 +169,7 @@
+     </div>
+   </nav>
+ 
+-  <!-- ── Tabs ── -->
+-  <div class="tabs">
+-    <button class="tab active" onclick="switchTab('aktiv',this)">Aktiv</button>
+-    <button class="tab" onclick="switchTab('schichten',this)">Schichten</button>
+-    <a class="tab" href="/eingabe" style="margin-left:auto;text-decoration:none;color:var(--accent-blue);border-bottom-color:transparent">+ Eingabe</a>
+-  </div>
++  <!-- top tabs removed, bottom bar below -->
+ 
+   <div id="tab-aktiv" class="tab-section visible">
+     <div id="activeContent"><div class="state-msg">Daten werden geladen…</div></div>
+@@ -178,12 +179,22 @@
+     <div id="shiftsList"><div class="state-msg">Schichten werden geladen…</div></div>
+   </div>
+ 
+-  <footer style="border-top:1px solid var(--border);padding:1rem 0;display:flex;justify-content:space-between;margin-top:auto">
++  <!-- spacer for bottom bar -->
++  <div class="bottom-bar-spacer"></div>
+---DIFF_END: worktracker.html
+
+
+---
+COMPARE: worktracker_2.0.5 -> worktracker_2.0.6
+
+MODIFIED: worktracker.html
+---DIFF_START: worktracker.html
+--- Worktracker/worktracker_2.0.5/worktracker.html	2026-04-11 03:34:29
++++ Worktracker/worktracker_2.0.6/worktracker.html	2026-04-11 03:39:35
+@@ -15,9 +15,6 @@
+ <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;700;800&display=swap" rel="stylesheet">
+ <link rel="stylesheet" href="/shared/bensn.css">
+ <style>
+-/* ── Color overrides ── */
+-:root { --orange: #FF0051; --accent-blue: #00A6ED; }
+-
+ /* ── App Layout ── */
+ body { overscroll-behavior: none; }
+ .app-wrap {
+@@ -84,53 +81,50 @@
+ }
+ 
+ /* ── Tabs ── */
+-.tab-section { display: none; } .tab-section.visible { display: block; }
+-
+-/* ── Bottom Tab Bar ── */
+-.bottom-bar {
+-  position: fixed;
+-  bottom: 0;
+-  left: 0;
+-  right: 0;
+-  z-index: 50;
+-  background: rgba(10,10,11,0.92);
+-  backdrop-filter: blur(16px);
+-  -webkit-backdrop-filter: blur(16px);
+-  border-top: 1px solid var(--border);
+-  display: flex;
+-  align-items: stretch;
+-  max-width: 800px;
+-  margin: 0 auto;
+-  padding-bottom: env(safe-area-inset-bottom, 0px);
+-}
+-/* Center the bar on wide screens */
+-@media (min-width: 800px) {
+-  .bottom-bar { left: 50%; right: auto; transform: translateX(-50%); width: 800px; }
+-}
+-.bottom-tab {
+-  flex: 1;
++.tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
++.tab {
+   font-family: 'DM Mono', monospace;
+   font-size: 11px;
+   text-transform: uppercase;
+   letter-spacing: .1em;
+-  padding: 14px 0 12px;
++  padding: 9px 14px;
+   cursor: pointer;
+   color: var(--muted);
+   border: none;
++  border-bottom: 2px solid transparent;
++  margin-bottom: -1px;
+   background: none;
+-  text-align: center;
+-  transition: color .15s;
+-  text-decoration: none;
+-  display: flex;
+-  align-items: center;
+-  justify-content: center;
++  transition: color .15s, border-color .15s;
+ }
+-.bottom-tab.active { color: var(--text); }
+-.bottom-tab:hover:not(.active) { color: var(--text); }
+-.bottom-tab-eingabe { color: var(--accent-blue) !important; }
+-/* Spacer so content doesn't hide behind bottom bar */
+-.bottom-bar-spacer { height: 80px; }
++.tab.active { color: var(--text); border-bottom-color: var(--text); }
++.tab:hover:not(.active) { color: var(--text); }
++.tab-section { display: none; } .tab-section.visible { display: block; }
+ 
++/* ── Shift Row Color Badge ── */
++:root { --orange: #F96F5D; }
++.wt-shift-row {
++  position: relative;
++  overflow: hidden;
++}
++/* Left color bar — 3px, full height, sits inside border-radius */
++.wt-shift-row::before {
++  content: '';
++  position: absolute;
++  left: 0;
++  top: 0;
++  bottom: 0;
++  width: 3px;
++  border-radius: 3px 0 0 3px;
++  pointer-events: none;
++  z-index: 2;
++}
++.wt-shift-row > * { position: relative; z-index: 1; }
++/* Extra left padding so content clears the color bar */
++.wt-shift-row { padding-left: 1.75rem; }
++.wt-shift-row.typ-frueh::before      { background: #FFB400; box-shadow: 0 0 8px 1px rgba(255,180,0,.45); }
++.wt-shift-row.typ-nachmittag::before { background: #F96F5D; box-shadow: 0 0 8px 1px rgba(249,111,93,.45); }
++.wt-shift-row.typ-nacht::before      { background: #00A6FB; box-shadow: 0 0 8px 1px rgba(0,166,251,.45); }
++
+ /* Prevent text selection on long press */
+ .wt-shift-row, .wt-table tr {
+   -webkit-user-select: none;
+@@ -138,6 +132,28 @@
+ }
+ /* Expand arrow */
+ .expand-arrow { font-size: 9px !important; }
++
++/* ── Mobile: Nav ans untere Ende ── */
++@media (max-width: 600px) {
++  .app-nav {
++    position: fixed;
++    bottom: 0;
++    left: 0;
++    right: 0;
++    z-index: 100;
++    background: rgba(10,10,11,0.92);
++    backdrop-filter: blur(12px);
++    -webkit-backdrop-filter: blur(12px);
++    border-top: 1px solid var(--border);
++    border-bottom: none;
++    margin-bottom: 0;
++    padding: .6rem 1.25rem;
+---DIFF_END: worktracker.html
+
+
+---
+COMPARE: worktracker_2.0.6 -> worktracker_2.0.7
+
+MODIFIED: worktracker.html
+---DIFF_START: worktracker.html
+--- Worktracker/worktracker_2.0.6/worktracker.html	2026-04-11 03:39:35
++++ Worktracker/worktracker_2.0.7/worktracker.html	2026-04-11 03:53:23
+@@ -101,7 +101,7 @@
+ .tab-section { display: none; } .tab-section.visible { display: block; }
+ 
+ /* ── Shift Row Color Badge ── */
+-:root { --orange: #F96F5D; }
++:root { --orange: #FF0051; }
+ .wt-shift-row {
+   position: relative;
+   overflow: hidden;
+@@ -123,7 +123,7 @@
+ .wt-shift-row { padding-left: 1.75rem; }
+ .wt-shift-row.typ-frueh::before      { background: #FFB400; box-shadow: 0 0 8px 1px rgba(255,180,0,.45); }
+ .wt-shift-row.typ-nachmittag::before { background: #F96F5D; box-shadow: 0 0 8px 1px rgba(249,111,93,.45); }
+-.wt-shift-row.typ-nacht::before      { background: #00A6FB; box-shadow: 0 0 8px 1px rgba(0,166,251,.45); }
++.wt-shift-row.typ-nacht::before      { background: #00A6ED; box-shadow: 0 0 8px 1px rgba(0,166,237,.45); }
+ 
+ /* Prevent text selection on long press */
+ .wt-shift-row, .wt-table tr {
+@@ -133,28 +133,6 @@
+ /* Expand arrow */
+ .expand-arrow { font-size: 9px !important; }
+ 
+-/* ── Mobile: Nav ans untere Ende ── */
+-@media (max-width: 600px) {
+-  .app-nav {
+-    position: fixed;
+-    bottom: 0;
+-    left: 0;
+-    right: 0;
+-    z-index: 100;
+-    background: rgba(10,10,11,0.92);
+-    backdrop-filter: blur(12px);
+-    -webkit-backdrop-filter: blur(12px);
+-    border-top: 1px solid var(--border);
+-    border-bottom: none;
+-    margin-bottom: 0;
+-    padding: .6rem 1.25rem;
+-    padding-bottom: max(env(safe-area-inset-bottom), .6rem);
+-  }
+-  .app-wrap {
+-    padding-bottom: 4.5rem; /* Platz für fixe Nav */
+-  }
+-}
+-
+ /* Pause table – wider S/B columns */
+ .wt-table th.col-s, .wt-table td.col-s,
+ .wt-table th.col-b, .wt-table td.col-b {
+@@ -368,12 +346,12 @@
+     const shiftColors = {
+       'früh':       'rgba(250,204,21,0.08)',
+       'nachmittag': 'rgba(232,114,74,0.08)',
+-      'nacht':      'rgba(0,166,251,0.08)'
++      'nacht':      'rgba(0,166,237,0.08)'
+     };
+     const shiftBorders = {
+       'früh':       'rgba(250,204,21,0.35)',
+       'nachmittag': 'rgba(232,114,74,0.35)',
+-      'nacht':      'rgba(0,166,251,0.35)'
++      'nacht':      'rgba(0,166,237,0.35)'
+     };
+ 
+     shifts.forEach((s,i)=>{
+@@ -443,7 +421,7 @@
+       // Café Puls
+       if(data.cafe_puls) {
+         html+=`<div style="font-family:'DM Mono',monospace;font-size:11px;margin-bottom:.75rem">
+-          <span style="background:rgba(0,166,251,.1);border:1px solid rgba(0,166,251,.2);color:var(--accent-blue);padding:3px 8px;border-radius:4px;font-size:10px;letter-spacing:.06em">CAFÉ PULS</span>
++          <span style="background:rgba(0,166,237,.1);border:1px solid rgba(0,166,237,.2);color:var(--accent-blue);padding:3px 8px;border-radius:4px;font-size:10px;letter-spacing:.06em">CAFÉ PULS</span>
+         </div>`;
+       }
+ 
+@@ -537,7 +515,7 @@
+             <div style="display:flex;flex-wrap:wrap;gap:.4rem" id="edit-station-${shiftId}">
+               ${['Puls4','ATV','ATV2','Puls24'].map(s=>`
+                 <div onclick="event.stopPropagation();selectEditStation('${shiftId}','${s}')" data-val="${s}"
+-                  style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.station===s?'var(--accent-blue)':'var(--border)'};color:${data.station===s?'var(--accent-blue)':'var(--muted)'};background:${data.station===s?'rgba(0,166,251,.08)':'none'};cursor:pointer;transition:all .15s">${s}</div>
++                  style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.station===s?'var(--accent-blue)':'var(--border)'};color:${data.station===s?'var(--accent-blue)':'var(--muted)'};background:${data.station===s?'rgba(0,166,237,.08)':'none'};cursor:pointer;transition:all .15s">${s}</div>
+               `).join('')}
+             </div>
+           </div>
+@@ -547,7 +525,7 @@
+             <div style="display:flex;gap:.4rem" id="edit-type-${shiftId}">
+               ${[['früh','Früh'],['nachmittag','Nachmittag'],['nacht','Nacht']].map(([v,l])=>`
+                 <div onclick="event.stopPropagation();selectEditType('${shiftId}','${v}')" data-val="${v}"
+-                  style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.shift_type===v?'var(--accent-blue)':'var(--border)'};color:${data.shift_type===v?'var(--accent-blue)':'var(--muted)'};background:${data.shift_type===v?'rgba(0,166,251,.08)':'none'};cursor:pointer;transition:all .15s">${l}</div>
++                  style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.shift_type===v?'var(--accent-blue)':'var(--border)'};color:${data.shift_type===v?'var(--accent-blue)':'var(--muted)'};background:${data.shift_type===v?'rgba(0,166,237,.08)':'none'};cursor:pointer;transition:all .15s">${l}</div>
+               `).join('')}
+             </div>
+           </div>
+@@ -556,9 +534,9 @@
+             <div class="wt-label" style="margin-bottom:4px">Café Puls</div>
+             <div style="display:flex;gap:.4rem">
+               <div onclick="event.stopPropagation();selectEditCafePuls('${shiftId}',true)" id="cp-yes-${shiftId}"
+-                style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.cafe_puls?'var(--accent-blue)':'var(--border)'};color:${data.cafe_puls?'var(--accent-blue)':'var(--muted)'};background:${data.cafe_puls?'rgba(0,166,251,.08)':'none'};cursor:pointer;transition:all .15s">Ja</div>
++                style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.cafe_puls?'var(--accent-blue)':'var(--border)'};color:${data.cafe_puls?'var(--accent-blue)':'var(--muted)'};background:${data.cafe_puls?'rgba(0,166,237,.08)':'none'};cursor:pointer;transition:all .15s">Ja</div>
+               <div onclick="event.stopPropagation();selectEditCafePuls('${shiftId}',false)" id="cp-no-${shiftId}"
+-                style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${!data.cafe_puls?'var(--accent-blue)':'var(--border)'};color:${!data.cafe_puls?'var(--accent-blue)':'var(--muted)'};background:${!data.cafe_puls?'rgba(0,166,251,.08)':'none'};cursor:pointer;transition:all .15s">Nein</div>
++                style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${!data.cafe_puls?'var(--accent-blue)':'var(--border)'};color:${!data.cafe_puls?'var(--accent-blue)':'var(--muted)'};background:${!data.cafe_puls?'rgba(0,166,237,.08)':'none'};cursor:pointer;transition:all .15s">Nein</div>
+             </div>
+           </div>
+ 
+@@ -637,7 +615,7 @@
+       const active = (el.id.includes('yes') && val) || (el.id.includes('no') && !val);
+       el.style.borderColor = active ? 'var(--accent-blue)' : 'var(--border)';
+       el.style.color       = active ? 'var(--accent-blue)' : 'var(--muted)';
+-      el.style.background  = active ? 'rgba(0,166,251,.08)' : 'none';
++      el.style.background  = active ? 'rgba(0,166,237,.08)' : 'none';
+     });
+   }
+ 
+@@ -646,7 +624,7 @@
+       const active = el.dataset.val === val;
+       el.style.borderColor = active ? 'var(--accent-blue)' : 'var(--border)';
+       el.style.color = active ? 'var(--accent-blue)' : 'var(--muted)';
+-      el.style.background = active ? 'rgba(0,166,251,.08)' : 'none';
++      el.style.background = active ? 'rgba(0,166,237,.08)' : 'none';
+     });
+   }
+---DIFF_END: worktracker.html
+
+
+---
+COMPARE: worktracker_2.0.7 -> worktracker_2.1.0
+
+MODIFIED: worktracker.html
+---DIFF_START: worktracker.html
+--- Worktracker/worktracker_2.0.7/worktracker.html	2026-04-11 03:53:23
++++ Worktracker/worktracker_2.1.0/worktracker.html	2026-04-11 04:01:33
+@@ -354,7 +354,24 @@
+       'nacht':      'rgba(0,166,237,0.35)'
+     };
+ 
++    const MONTHS_DE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
++    let lastMonthKey = null;
++    let animIdx = 0;
++
+     shifts.forEach((s,i)=>{
++      // ── Month header ──
++      const d = new Date(s.work_start);
++      const monthKey = `${d.getFullYear()}-${d.getMonth()}`;
++      if(monthKey !== lastMonthKey){
++        lastMonthKey = monthKey;
++        const hdr = document.createElement('div');
++        hdr.style.cssText='font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;letter-spacing:-0.02em;color:var(--text);margin:1.75rem 0 .75rem;opacity:0;transition:opacity .4s ease';
++        hdr.textContent = MONTHS_DE[d.getMonth()] + ' ' + d.getFullYear();
++        list.appendChild(hdr);
++        setTimeout(()=>hdr.style.opacity='1', 80 + animIdx*80);
++        animIdx++;
++      }
++
+       const isActive=!s.work_end;
+       const grossMin=s.work_end?Math.round((new Date(s.work_end)-new Date(s.work_start))/60000):null;
+       const nettoMin=grossMin!==null?grossMin-(s.total_break_minutes||0):null;
+@@ -392,7 +409,8 @@
+         toggleShiftDetail(el, s.id);
+       });
+       list.appendChild(el);
+-      setTimeout(()=>{el.style.opacity='1';el.style.transform='none';},100+i*80);
++      setTimeout(()=>{el.style.opacity='1';el.style.transform='none';},100+animIdx*80);
++      animIdx++;
+     });
+   }
+ 
+---DIFF_END: worktracker.html
+
+
+---
+COMPARE: worktracker_2.1.0 -> worktracker_2.1.1
+
+ADDED: eingabe.html
+ADDED: index.html
+ADDED: manifest.json
+ADDED: sw.js
+REMOVED: worktracker.html
+
+---
+COMPARE: worktracker_2.1.1 -> worktracker_2.1.2
+
+ADDED: api.py
+MODIFIED: index.html
+---DIFF_START: index.html
+--- Worktracker/worktracker_2.1.1/index.html	2026-04-14 09:11:39
++++ Worktracker/worktracker_2.1.2/index.html	2026-04-14 09:21:02
+@@ -893,6 +893,15 @@
+             <button onclick="adjustBE('blend',-1)" style="width:32px;height:32px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);font-size:1.1rem;cursor:pointer">−</button>
+             <span id="be-blend" style="font-family:'DM Mono',monospace;font-size:1.2rem;flex:1;text-align:center">0</span>
+             <button onclick="adjustBE('blend',1)" style="width:32px;height:32px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);font-size:1.1rem;cursor:pointer">+</button>
++          </div>
++        </div>
++        <div style="margin-bottom:.75rem">
++          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Typ</div>
++          <div style="display:flex;flex-wrap:wrap;gap:.4rem" id="be-types">
++            ${['Rauchen','WC','Einkaufen','Essen','Sonstiges'].map(t=>`
++              <div onclick="toggleBEType(this,'${t}')" data-val="${t}"
++                style="font-family:'DM Mono',monospace;font-size:11px;padding:5px 11px;border-radius:6px;border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:all .15s">${t}</div>
++            `).join('')}
+           </div>
+         </div>
+         <div style="margin-bottom:1rem">
+@@ -917,6 +926,17 @@
+       document.getElementById('be-spicy').textContent = b.zig_spicy||0;
+       document.getElementById('be-blend').textContent = b.zig_blend||0;
+       document.getElementById('be-notes').value = b.notes||'';
++      // Typ vorausfüllen
++      if(b.break_type) {
++        const types = b.break_type.split(' + ').map(t=>t.trim());
++        document.querySelectorAll('#be-types div').forEach(el => {
++          if(types.includes(el.dataset.val)) {
++            el.style.borderColor = 'var(--accent-blue)';
++            el.style.color = 'var(--accent-blue)';
++            el.style.background = 'rgba(0,166,237,.08)';
++          }
++        });
++      }
+       // Store base date for time conversion
+       overlay.dataset.baseDate = toLocalISO(b.break_start).split('T')[0];
+     });
+@@ -929,6 +949,13 @@
+     el.textContent = Math.max(0, parseInt(el.textContent)+delta);
+   }
+ 
++  function toggleBEType(el, val) {
++    const active = el.style.borderColor.includes('166');
++    el.style.borderColor = active ? 'var(--border)' : 'var(--accent-blue)';
++    el.style.color = active ? 'var(--muted)' : 'var(--accent-blue)';
++    el.style.background = active ? 'none' : 'rgba(0,166,237,.08)';
++  }
++
+   async function saveBreakEdit(breakId, shiftId) {
+     const overlay = document.getElementById('break-edit-overlay');
+     const baseDate = overlay.dataset.baseDate || new Date().toISOString().split('T')[0];
+@@ -939,12 +966,18 @@
+     const notes     = document.getElementById('be-notes').value||null;
+     const msg       = document.getElementById('be-msg');
+ 
++    const selectedTypes = [...document.querySelectorAll('#be-types div')]
++      .filter(el => el.style.borderColor.includes('166'))
++      .map(el => el.dataset.val);
++    const breakType = selectedTypes.length > 0 ? selectedTypes.join(' + ') : null;
++
+     const payload = {
+       zig_spicy: spicy,
+       zig_blend: blend,
+       notes,
+       corrected_reason: 'Manuelle Korrektur'
+     };
++    if(breakType) payload.break_type = breakType;
+     if(startTime) payload.break_start = localToUTC(`${baseDate}T${startTime}`);
+     if(endTime)   payload.break_end   = localToUTC(`${baseDate}T${endTime}`);
+ 
+@@ -987,13 +1020,9 @@
+       const d = await apiFetch(`/api/break/${breakId}`, 'DELETE');
+       if(d.status === 'deleted') {
+         document.getElementById('break-edit-overlay')?.remove();
+-        // Reload the shift detail
+-        const detailContainer = document.getElementById(`detail-${shiftId}`);
+-        if(detailContainer) {
+-          detailContainer.innerHTML = '<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted);text-align:center;padding:.5rem">Laden…</div>';
+-          toggleShiftDetail(detailContainer.closest('.wt-shift-row'), shiftId);
+-          toggleShiftDetail(detailContainer.closest('.wt-shift-row'), shiftId);
+-        }
++        // Schichten neu laden
++        shiftsLoaded = false;
++        loadShifts();
+       }
+     } catch(e) {
+       alert('Fehler: ' + e.message);
+---DIFF_END: index.html
+
+REMOVED: eingabe.html
+REMOVED: manifest.json
+REMOVED: sw.js
+
+---
+COMPARE: worktracker_2.1.2 -> worktracker_2.1.3
+
+MODIFIED: api.py
+---DIFF_START: api.py
+--- Worktracker/worktracker_2.1.2/api.py	2026-04-14 09:40:38
++++ Worktracker/worktracker_2.1.3/api.py	2026-04-14 09:52:05
+@@ -230,7 +230,7 @@
+ 
+     shift = serialize(row)
+     breaks = db_query(
+-        "SELECT * FROM breaks WHERE shift_id = %s ORDER BY break_start",
++        "SELECT * FROM breaks WHERE shift_id = %s AND (deleted IS NULL OR deleted = false) ORDER BY break_start",
+         (shift_id,)
+     )
+     shift["breaks"] = serialize_list(breaks)
+@@ -812,6 +812,7 @@
+     return jsonify({"break": dict(row)})
+ 
+ @app.route("/api/shift/<shift_id>", methods=["DELETE"])
++@require_api_key
+ def shift_delete(shift_id):
+     shift = db_query("SELECT id FROM shifts WHERE id = %s", (shift_id,), fetchone=True)
+     if not shift:
+@@ -822,6 +823,7 @@
+ 
+ 
+ @app.route("/api/break/<break_id>", methods=["DELETE"])
++@require_api_key
+ def break_delete(break_id):
+     brk = db_query("SELECT id FROM breaks WHERE id = %s", (break_id,), fetchone=True)
+     if not brk:
+---DIFF_END: api.py
+
+MODIFIED: index.html
+---DIFF_START: index.html
+--- Worktracker/worktracker_2.1.2/index.html	2026-04-14 09:21:02
++++ Worktracker/worktracker_2.1.3/index.html	2026-04-14 10:11:07
+@@ -796,7 +796,7 @@
+     if(!startTime) { msg.style.color='var(--accent-red)'; msg.textContent='Bitte Startzeit angeben'; return; }
+ 
+     const selectedTypes = [...document.querySelectorAll('#ab-types div')]
+-      .filter(el => el.style.borderColor.includes('251'))
++      .filter(el => el.style.borderColor.includes('166'))
+       .map(el => el.dataset.val);
+     const breakType = selectedTypes.length > 0 ? selectedTypes.join(' + ') : 'Pause';
+ 
+@@ -827,6 +827,7 @@
+         setTimeout(() => {
+           document.getElementById('break-edit-overlay')?.remove();
+           loadShifts();
++          loadActive();
+         }, 700);
+       } else {
+         msg.style.color = 'var(--accent-red)';
+@@ -986,7 +987,7 @@
+       if(d.break) {
+         msg.style.color = 'var(--green)';
+         msg.textContent = '✓ Gespeichert';
+-        setTimeout(() => { overlay.remove(); loadShifts(); }, 700);
++        setTimeout(() => { overlay.remove(); loadShifts(); loadActive(); }, 700);
+       } else {
+         msg.style.color = 'var(--accent-red)';
+         msg.textContent = d.error||'Fehler';
+@@ -1020,9 +1021,9 @@
+       const d = await apiFetch(`/api/break/${breakId}`, 'DELETE');
+       if(d.status === 'deleted') {
+         document.getElementById('break-edit-overlay')?.remove();
+-        // Schichten neu laden
+         shiftsLoaded = false;
+         loadShifts();
++        loadActive();
+       }
+     } catch(e) {
+       alert('Fehler: ' + e.message);
+---DIFF_END: index.html
+
+
+---
+COMPARE: worktracker_2.1.3 -> worktracker_2.1.4
+
+MODIFIED: api.py
+---DIFF_START: api.py
+--- Worktracker/worktracker_2.1.3/api.py	2026-04-14 09:52:05
++++ Worktracker/worktracker_2.1.4/api.py	2026-04-17 16:55:11
+@@ -794,7 +794,7 @@
+     if not shift:
+         return jsonify({"error": "Shift not found"}), 404
+ 
+-    row = db_query("""
++    row = db_insert("""
+         INSERT INTO breaks (shift_id, break_start, break_end, break_type, zig_spicy, zig_blend, notes, source)
+         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+         RETURNING *
+@@ -807,7 +807,7 @@
+         d.get("zig_blend", 0),
+         d.get("notes"),
+         d.get("source", "pwa")
+-    ), fetchone=True)
++    ))
+ 
+     return jsonify({"break": dict(row)})
+ 
+---DIFF_END: api.py
+
+ADDED_DIR: eingabe
+MODIFIED: index.html
+---DIFF_START: index.html
+--- Worktracker/worktracker_2.1.3/index.html	2026-04-14 10:11:07
++++ Worktracker/worktracker_2.1.4/index.html	2026-04-17 16:53:44
+@@ -773,10 +773,11 @@
+   }
+ 
+   function toggleAbType(el, val) {
+-    const active = el.style.borderColor.includes('251');
+-    el.style.borderColor = active ? 'var(--border)' : 'var(--accent-blue)';
+-    el.style.color = active ? 'var(--muted)' : 'var(--accent-blue)';
+-    el.style.background = active ? 'none' : 'rgba(0,166,237,.08)';
++    const active = el.dataset.active === '1';
++    el.dataset.active = active ? '' : '1';
++    el.style.borderColor = active ? '' : 'var(--accent-blue)';
++    el.style.color = active ? '' : 'var(--accent-blue)';
++    el.style.background = active ? '' : 'rgba(0,166,237,.08)';
+   }
+ 
+   function adjustAB(type, delta) {
+@@ -796,7 +797,7 @@
+     if(!startTime) { msg.style.color='var(--accent-red)'; msg.textContent='Bitte Startzeit angeben'; return; }
+ 
+     const selectedTypes = [...document.querySelectorAll('#ab-types div')]
+-      .filter(el => el.style.borderColor.includes('166'))
++      .filter(el => el.dataset.active === '1')
+       .map(el => el.dataset.val);
+     const breakType = selectedTypes.length > 0 ? selectedTypes.join(' + ') : 'Pause';
+ 
+@@ -826,6 +827,7 @@
+         msg.textContent = '✓ Pause hinzugefügt';
+         setTimeout(() => {
+           document.getElementById('break-edit-overlay')?.remove();
++          shiftsLoaded=false;
+           loadShifts();
+           loadActive();
+         }, 700);
+@@ -932,6 +934,7 @@
+         const types = b.break_type.split(' + ').map(t=>t.trim());
+         document.querySelectorAll('#be-types div').forEach(el => {
+           if(types.includes(el.dataset.val)) {
++            el.dataset.active = '1';
+             el.style.borderColor = 'var(--accent-blue)';
+             el.style.color = 'var(--accent-blue)';
+             el.style.background = 'rgba(0,166,237,.08)';
+@@ -951,10 +954,11 @@
+   }
+ 
+   function toggleBEType(el, val) {
+-    const active = el.style.borderColor.includes('166');
+-    el.style.borderColor = active ? 'var(--border)' : 'var(--accent-blue)';
+-    el.style.color = active ? 'var(--muted)' : 'var(--accent-blue)';
+-    el.style.background = active ? 'none' : 'rgba(0,166,237,.08)';
++    const active = el.dataset.active === '1';
++    el.dataset.active = active ? '' : '1';
++    el.style.borderColor = active ? '' : 'var(--accent-blue)';
++    el.style.color = active ? '' : 'var(--accent-blue)';
++    el.style.background = active ? '' : 'rgba(0,166,237,.08)';
+   }
+ 
+   async function saveBreakEdit(breakId, shiftId) {
+@@ -968,7 +972,7 @@
+     const msg       = document.getElementById('be-msg');
+ 
+     const selectedTypes = [...document.querySelectorAll('#be-types div')]
+-      .filter(el => el.style.borderColor.includes('166'))
++      .filter(el => el.dataset.active === '1')
+       .map(el => el.dataset.val);
+     const breakType = selectedTypes.length > 0 ? selectedTypes.join(' + ') : null;
+ 
+@@ -987,7 +991,7 @@
+       if(d.break) {
+         msg.style.color = 'var(--green)';
+         msg.textContent = '✓ Gespeichert';
+-        setTimeout(() => { overlay.remove(); loadShifts(); loadActive(); }, 700);
++        setTimeout(() => { overlay.remove(); shiftsLoaded=false; loadShifts(); loadActive(); }, 700);
+       } else {
+         msg.style.color = 'var(--accent-red)';
+         msg.textContent = d.error||'Fehler';
+---DIFF_END: index.html
+
+
+---
+COMPARE: worktracker_2.1.4 -> worktracker_2.1.5
+
+MODIFIED: index.html
+---DIFF_START: index.html
+--- Worktracker/worktracker_2.1.4/index.html	2026-04-17 16:53:44
++++ Worktracker/worktracker_2.1.5/index.html	2026-04-17 17:01:30
+@@ -533,7 +533,7 @@
+             <div style="display:flex;flex-wrap:wrap;gap:.4rem" id="edit-station-${shiftId}">
+               ${['Puls4','ATV','ATV2','Puls24'].map(s=>`
+                 <div onclick="event.stopPropagation();selectEditStation('${shiftId}','${s}')" data-val="${s}"
+-                  style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.station===s?'var(--accent-blue)':'var(--border)'};color:${data.station===s?'var(--accent-blue)':'var(--muted)'};background:${data.station===s?'rgba(0,166,237,.08)':'none'};cursor:pointer;transition:all .15s">${s}</div>
++                  data-active="${data.station===s?'1':''}" style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.station===s?'var(--accent-blue)':'var(--border)'};color:${data.station===s?'var(--accent-blue)':'var(--muted)'};background:${data.station===s?'rgba(0,166,237,.08)':'none'};cursor:pointer;transition:all .15s">${s}</div>
+               `).join('')}
+             </div>
+           </div>
+@@ -543,7 +543,7 @@
+             <div style="display:flex;gap:.4rem" id="edit-type-${shiftId}">
+               ${[['früh','Früh'],['nachmittag','Nachmittag'],['nacht','Nacht']].map(([v,l])=>`
+                 <div onclick="event.stopPropagation();selectEditType('${shiftId}','${v}')" data-val="${v}"
+-                  style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.shift_type===v?'var(--accent-blue)':'var(--border)'};color:${data.shift_type===v?'var(--accent-blue)':'var(--muted)'};background:${data.shift_type===v?'rgba(0,166,237,.08)':'none'};cursor:pointer;transition:all .15s">${l}</div>
++                  data-active="${data.shift_type===v?'1':''}" style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.shift_type===v?'var(--accent-blue)':'var(--border)'};color:${data.shift_type===v?'var(--accent-blue)':'var(--muted)'};background:${data.shift_type===v?'rgba(0,166,237,.08)':'none'};cursor:pointer;transition:all .15s">${l}</div>
+               `).join('')}
+             </div>
+           </div>
+@@ -551,9 +551,9 @@
+           <div style="margin-bottom:.75rem">
+             <div class="wt-label" style="margin-bottom:4px">Café Puls</div>
+             <div style="display:flex;gap:.4rem">
+-              <div onclick="event.stopPropagation();selectEditCafePuls('${shiftId}',true)" id="cp-yes-${shiftId}"
++              <div onclick="event.stopPropagation();selectEditCafePuls('${shiftId}',true)" id="cp-yes-${shiftId}" data-active="${data.cafe_puls?'1':''}"
+                 style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.cafe_puls?'var(--accent-blue)':'var(--border)'};color:${data.cafe_puls?'var(--accent-blue)':'var(--muted)'};background:${data.cafe_puls?'rgba(0,166,237,.08)':'none'};cursor:pointer;transition:all .15s">Ja</div>
+-              <div onclick="event.stopPropagation();selectEditCafePuls('${shiftId}',false)" id="cp-no-${shiftId}"
++              <div onclick="event.stopPropagation();selectEditCafePuls('${shiftId}',false)" id="cp-no-${shiftId}" data-active="${!data.cafe_puls?'1':''}"
+                 style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${!data.cafe_puls?'var(--accent-blue)':'var(--border)'};color:${!data.cafe_puls?'var(--accent-blue)':'var(--muted)'};background:${!data.cafe_puls?'rgba(0,166,237,.08)':'none'};cursor:pointer;transition:all .15s">Nein</div>
+             </div>
+           </div>
+@@ -631,6 +631,7 @@
+     const no  = document.getElementById(`cp-no-${shiftId}`);
+     [yes, no].forEach(el => {
+       const active = (el.id.includes('yes') && val) || (el.id.includes('no') && !val);
++      el.dataset.active = active ? '1' : '';
+       el.style.borderColor = active ? 'var(--accent-blue)' : 'var(--border)';
+       el.style.color       = active ? 'var(--accent-blue)' : 'var(--muted)';
+       el.style.background  = active ? 'rgba(0,166,237,.08)' : 'none';
+@@ -640,6 +641,7 @@
+   function selectEditStation(shiftId, val) {
+     document.querySelectorAll(`#edit-station-${shiftId} div`).forEach(el => {
+       const active = el.dataset.val === val;
++      el.dataset.active = active ? '1' : '';
+       el.style.borderColor = active ? 'var(--accent-blue)' : 'var(--border)';
+       el.style.color = active ? 'var(--accent-blue)' : 'var(--muted)';
+       el.style.background = active ? 'rgba(0,166,237,.08)' : 'none';
+@@ -649,6 +651,7 @@
+   function selectEditType(shiftId, val) {
+     document.querySelectorAll(`#edit-type-${shiftId} div`).forEach(el => {
+       const active = el.dataset.val === val;
++      el.dataset.active = active ? '1' : '';
+       el.style.borderColor = active ? 'var(--accent-blue)' : 'var(--border)';
+       el.style.color = active ? 'var(--accent-blue)' : 'var(--muted)';
+       el.style.background = active ? 'rgba(0,166,237,.08)' : 'none';
+@@ -661,8 +664,8 @@
+     const endDate   = document.getElementById(`edit-end-date-${shiftId}`)?.value;
+     const endTime   = document.getElementById(`edit-end-time-${shiftId}`)?.value;
+     const notesVal  = document.getElementById(`edit-notes-${shiftId}`)?.value;
+-    const station   = document.querySelector(`#edit-station-${shiftId} div[style*="rgba(0,166,237"]`)?.dataset.val;
+-    const shiftType = document.querySelector(`#edit-type-${shiftId} div[style*="rgba(0,166,237"]`)?.dataset.val;
++    const station   = document.querySelector(`#edit-station-${shiftId} div[data-active="1"]`)?.dataset.val;
++    const shiftType = document.querySelector(`#edit-type-${shiftId} div[data-active="1"]`)?.dataset.val;
+     const msg = document.getElementById(`edit-msg-${shiftId}`);
+ 
+     const payload = { corrected_reason: 'Manuelle Korrektur' };
+@@ -681,7 +684,7 @@
+     if(shiftType)  payload.shift_type = shiftType;
+     payload.notes = notesVal || null;
+     const cpYes = document.getElementById(`cp-yes-${shiftId}`);
+-    if(cpYes) payload.cafe_puls = cpYes.style.background.includes('rgba');
++    if(cpYes) payload.cafe_puls = cpYes.dataset.active === '1';
+ 
+     try {
+       const d = await apiFetch(`/api/shift/${shiftId}/correct`, 'PATCH', payload);
+---DIFF_END: index.html
+
+REMOVED: api.py
+
+---
+COMPARE: worktracker_2.1.5 -> worktracker_2.1.6
+
+MODIFIED: index.html
+---DIFF_START: index.html
+--- Worktracker/worktracker_2.1.5/index.html	2026-04-17 17:01:30
++++ Worktracker/worktracker_2.1.6/index.html	2026-04-17 17:12:28
+@@ -531,9 +531,9 @@
+           <div style="margin-bottom:.75rem">
+             <div class="wt-label" style="margin-bottom:4px">Station</div>
+             <div style="display:flex;flex-wrap:wrap;gap:.4rem" id="edit-station-${shiftId}">
+-              ${['Puls4','ATV','ATV2','Puls24'].map(s=>`
+-                <div onclick="event.stopPropagation();selectEditStation('${shiftId}','${s}')" data-val="${s}"
+-                  data-active="${data.station===s?'1':''}" style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.station===s?'var(--accent-blue)':'var(--border)'};color:${data.station===s?'var(--accent-blue)':'var(--muted)'};background:${data.station===s?'rgba(0,166,237,.08)':'none'};cursor:pointer;transition:all .15s">${s}</div>
++              ${['Puls4','ATV/ATV2','ATV','ATV2','Puls24'].map(s=>`
++                <div onclick="event.stopPropagation();selectEditStation('${shiftId}','${s}')" data-val="${s}" data-active="${data.station===s?'1':''}" 
++                  style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.station===s?'var(--accent-blue)':'var(--border)'};color:${data.station===s?'var(--accent-blue)':'var(--muted)'};background:${data.station===s?'rgba(0,166,237,.08)':'none'};cursor:pointer;transition:all .15s">${s}</div>
+               `).join('')}
+             </div>
+           </div>
+@@ -542,8 +542,8 @@
+             <div class="wt-label" style="margin-bottom:4px">Schichttyp</div>
+             <div style="display:flex;gap:.4rem" id="edit-type-${shiftId}">
+               ${[['früh','Früh'],['nachmittag','Nachmittag'],['nacht','Nacht']].map(([v,l])=>`
+-                <div onclick="event.stopPropagation();selectEditType('${shiftId}','${v}')" data-val="${v}"
+-                  data-active="${data.shift_type===v?'1':''}" style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.shift_type===v?'var(--accent-blue)':'var(--border)'};color:${data.shift_type===v?'var(--accent-blue)':'var(--muted)'};background:${data.shift_type===v?'rgba(0,166,237,.08)':'none'};cursor:pointer;transition:all .15s">${l}</div>
++                <div onclick="event.stopPropagation();selectEditType('${shiftId}','${v}')" data-val="${v}" data-active="${data.shift_type===v?'1':''}"
++                  style="font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid ${data.shift_type===v?'var(--accent-blue)':'var(--border)'};color:${data.shift_type===v?'var(--accent-blue)':'var(--muted)'};background:${data.shift_type===v?'rgba(0,166,237,.08)':'none'};cursor:pointer;transition:all .15s">${l}</div>
+               `).join('')}
+             </div>
+           </div>
+@@ -605,20 +605,30 @@
+ 
+   function localToUTC(val) {
+     if(!val) return null;
+-    // val is "YYYY-MM-DDTHH:MM" in Vienna time
+-    // Append Vienna offset manually via Date parsing
++    // val is "YYYY-MM-DDTHH:MM" in Vienna local time
++    // Parse as Vienna time by appending a dummy Vienna offset string and using Date
++    // We use Intl to find the actual UTC offset for this moment in Vienna
+     const [date, time] = val.split('T');
+     const [y,m,d] = date.split('-');
+     const [h,min] = time.split(':');
+-    // Create date as if UTC, then offset
+-    const utc = new Date(Date.UTC(+y,+m-1,+d,+h,+min));
+-    // Get Vienna offset at that moment
+-    const viennaStr = utc.toLocaleString('en-US',{timeZone:'Europe/Vienna',hour12:false,hour:'2-digit',minute:'2-digit'}).replace('24:','00:');
+-    const viennaH = parseInt(viennaStr.split(':')[0]);
+-    const utcH = utc.getUTCHours();
+-    const offset = viennaH - utcH;
+-    utc.setUTCHours(utc.getUTCHours() - offset);
+-    return utc.toISOString();
++    // Build a date string that JS can parse as local, then correct for Vienna tz
++    // Strategy: iterate to find correct offset (handles DST)
++    const approx = new Date(`${date}T${time}:00`); // parsed as local browser time
++    // Get what Vienna thinks this moment is
++    const viennaParts = new Intl.DateTimeFormat('en-CA', {
++      timeZone: 'Europe/Vienna',
++      year:'numeric', month:'2-digit', day:'2-digit',
++      hour:'2-digit', minute:'2-digit', hour12:false
++    }).formatToParts(approx);
++    const vp = {};
++    viennaParts.forEach(({type,value}) => vp[type]=value);
++    const viennaISO = `${vp.year}-${vp.month}-${vp.day}T${vp.hour}:${vp.minute}`;
++    // Difference between what we want and what Vienna shows = correction needed
++    const wantMin = +y*525600 + (+m-1)*43800 + +d*1440 + +h*60 + +min;
++    const gotMin  = parseInt(vp.year)*525600 + (parseInt(vp.month)-1)*43800 + parseInt(vp.day)*1440 + parseInt(vp.hour)*60 + parseInt(vp.minute);
++    const diffMs  = (wantMin - gotMin) * 60000;
++    const corrected = new Date(approx.getTime() + diffMs);
++    return corrected.toISOString();
+   }
+ 
+   function toggleEditForm(shiftId) {
+---DIFF_END: index.html
+
+ADDED_DIR: worktracker_2.1.6.1
+REMOVED_DIR: eingabe
+
