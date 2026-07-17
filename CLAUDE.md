@@ -51,7 +51,7 @@ Ablageort: `~/Documents/Coding/bensn-hub/worktracker/CLAUDE.md`
 
 | Dienst | Port | Deployment |
 |--------|------|------------|
-| bensn-api | 5001 | Docker: `bensn-api` Container (`/var/www/bensn-hub/`) |
+| bensn-api | 5001 | Docker: `bensn-api` Container (`/root/bensn-hub/`) |
 
 Die API ist **nicht in diesem Repo** — sie ist der geteilte "bensn Personal OS"-Backend (verwaltet in `~/Documents/Coding/bensn-hub/bensn-meta/hub-versions/`).
 
@@ -66,8 +66,8 @@ scp ~/Documents/Coding/bensn-hub/worktracker/worktracker_2.1.6.1/index.html \
 
 # API-Änderungen: in bensn-meta/hub-versions/vX.X.X/api.py bearbeiten, dann:
 scp ~/Documents/Coding/bensn-hub/bensn-meta/hub-versions/v3.0.0/api.py \
-  bensn:/var/www/bensn-hub/api.py
-ssh bensn "cd /var/www/bensn-hub && docker compose up -d --build"
+  bensn:/root/bensn-hub/api.py
+ssh bensn "cd /root/bensn-hub && docker compose up -d --build"
 
 # nginx-Config (bei Infrastruktur-Änderungen)
 scp ~/Documents/Coding/bensn-hub/bensn-meta/nginx/worktracker.bensn.me \
