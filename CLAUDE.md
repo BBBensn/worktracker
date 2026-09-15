@@ -91,7 +91,9 @@ git push origin main
 
 ## Auth
 
-- **Kein Frontend-Auth** — die Seite ist öffentlich erreichbar
+- **Cookie-Auth (bensn-auth)** auf `/` — verifiziert gegen die Live-nginx-Config
+  (`bensn-meta/nginx/worktracker.bensn.me`), entgegen einer älteren Notiz hier, die das
+  Frontend fälschlich als auth-los beschrieb
 - **API:** nginx injiziert `X-API-Key` automatisch via `proxy_set_header` (kein Key im Frontend-Code)
 - Der API-Key liegt nur in der nginx-Config (`/etc/nginx/sites-enabled/worktracker.bensn.me`)
 
