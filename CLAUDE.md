@@ -19,11 +19,8 @@ Ablageort: `~/Documents/Coding/bensn-hub/worktracker/CLAUDE.md`
 
 ```
 ~/Documents/Coding/bensn-hub/worktracker/
-├── worktracker_2.1.6.1/     ← aktuellste Version
-│   └── index.html
-├── worktracker_2.1.6/       ← ältere Versionen (Archiv)
-│   └── index.html
-├── ... (weitere Archiv-Ordner worktracker_X.X.X/)
+├── index.html               ← aktuelle PWA
+├── eingabe/index.html       ← Korrektur-/Manuell-Eingabe-Unterseite
 ├── Shortcuts/               ← iOS Shortcuts (Arbeitsbeginn, Arbeitsende, Pause)
 │   └── 20260410-1835-Worktracker/
 ├── icon/                    ← PWA App-Icons (favicon, apple-touch, 192/512)
@@ -61,8 +58,10 @@ Die API ist **nicht in diesem Repo** — sie ist der geteilte "bensn Personal OS
 
 ```bash
 # Frontend (nur index.html ändern sich normalerweise)
-scp ~/Documents/Coding/bensn-hub/worktracker/worktracker_2.1.6.1/index.html \
+scp ~/Documents/Coding/bensn-hub/worktracker/index.html \
   bensn:/var/www/worktracker/index.html
+scp ~/Documents/Coding/bensn-hub/worktracker/eingabe/index.html \
+  bensn:/var/www/worktracker/eingabe/index.html
 
 # API-Änderungen: in bensn-meta/hub-versions/vX.X.X/api.py bearbeiten, dann:
 scp ~/Documents/Coding/bensn-hub/bensn-meta/hub-versions/v3.0.0/api.py \
@@ -83,7 +82,7 @@ ssh bensn "nginx -t && systemctl reload nginx"
 - **Remote:** `git@github.com:BBBensn/worktracker.git`
 
 ```bash
-git add worktracker_2.1.6.1/index.html
+git add index.html
 git commit -m "Add [feature]"
 git push origin main
 ```
@@ -133,8 +132,8 @@ git push origin main
 
 ## Projekt-spezifische Konventionen
 
-- Neue Versionen als separate Ordner anlegen: `worktracker_X.X.X/`
-- Die aktuellste Version ist immer der Ordner mit der höchsten Versionsnummer
+- Flacher Repo-Root (kein `worktracker_X.X.X/`-Versionsarchiv mehr) — Versionshistorie läuft
+  über Git-Commits + `docs/changelogs/`
 - iOS Shortcuts werden in `Shortcuts/` versioniert (ZIP + entpackt)
 - API-Änderungen **nicht** in diesem Repo — in `bensn-meta/hub-versions/` bearbeiten
 - Frontend ist reines Vanilla JS — kein Build-Prozess, kein npm
