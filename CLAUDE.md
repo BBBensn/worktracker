@@ -9,7 +9,7 @@ Ablageort: `~/Documents/Coding/bensn-hub/worktracker/CLAUDE.md`
 
 - **Name:** worktracker
 - **Domain:** worktracker.bensn.me
-- **Version:** v2.2.0
+- **Version:** v2.2.1
 - **Status:** active
 - **Stack:** Vanilla JS (PWA, kein Build-Schritt) + Flask + PostgreSQL 16 (Docker)
 
@@ -139,6 +139,14 @@ git push origin main
 - iOS Shortcuts werden in `Shortcuts/` versioniert (ZIP + entpackt)
 - API-Änderungen **nicht** in diesem Repo — in `bensn-meta/hub-versions/` bearbeiten
 - Frontend ist reines Vanilla JS — kein Build-Prozess, kein npm
+- **Design-Sprache:** worktracker ist der visuelle Ursprung von `.btn-pill` ("Bearbeiten"/
+  "+ Pause"), die Klasse selbst wurde hier aber nie eingeführt — nur als Inline-`style`
+  wiederholt (mit leicht abweichenden Werten je Stelle). Seit 2026-09-16 nutzen
+  "Bearbeiten"/"+ Pause" die echte `.btn-pill`-Klasse aus `bensn-meta/shared/bensn.css`
+  (identisch zu health/feed/tracking). Die "Löschen"-Buttons in den Save/Cancel/Delete-
+  Formularzeilen (`saveEdit`/`deleteShift`, `deleteBreak`) sind noch NICHT vereinheitlicht —
+  3 verschiedene Font-/Padding-Werte an 2 Stellen, keine gemeinsame Klasse. Vollständiger
+  Style-Guide + die offene Inkonsistenz im Detail: `bensn-meta/design-system.html`
 
 ---
 
@@ -148,6 +156,7 @@ git push origin main
 |---------|---------|--------|
 | v2.1.6.1 | Vorheriger Stand | ✅ done |
 | v2.2.0 | Zeit-Editierbarkeit in der Eingabe-Seite (Pause Start/Ende) + Long-Press-Edit im Aktiv-Tab | ✅ done |
+| v2.2.1 | "Bearbeiten"/"+ Pause" auf die zentrale `.btn-pill`-Klasse umgestellt (vorher Inline-Styles) | ✅ deployed (2026-09-16) |
 
 ---
 

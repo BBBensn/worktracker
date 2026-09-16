@@ -500,10 +500,8 @@ body { overscroll-behavior: none; }
       container.innerHTML=html+`
         <div class="wt-divider" style="margin:.75rem 0"></div>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.75rem">
-          <button onclick="event.stopPropagation();toggleEditForm('${shiftId}')" id="edit-btn-${shiftId}"
-            style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:6px;cursor:pointer">Bearbeiten</button>
-          <button onclick="event.stopPropagation();openAddBreak('${shiftId}','${toLocalISO(data.work_start).split('T')[0]}')"
-            style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:none;border:1px solid rgba(74,222,128,.3);color:var(--green);padding:6px 12px;border-radius:6px;cursor:pointer">+ Pause</button>
+          <button class="btn-pill" onclick="event.stopPropagation();toggleEditForm('${shiftId}')" id="edit-btn-${shiftId}">Bearbeiten</button>
+          <button class="btn-pill green" onclick="event.stopPropagation();openAddBreak('${shiftId}','${toLocalISO(data.work_start).split('T')[0]}')">+ Pause</button>
         </div>
 
         <div id="edit-${shiftId}" style="display:none;margin-top:.5rem" onclick="event.stopPropagation()">
