@@ -573,8 +573,7 @@ body { overscroll-behavior: none; }
               style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.06em;background:var(--green);color:#0a0a0b;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-weight:500">Speichern</button>
             <button onclick="event.stopPropagation();toggleEditForm('${shiftId}')"
               style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.06em;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 16px;cursor:pointer">Abbrechen</button>
-            <button onclick="event.stopPropagation();deleteShift('${shiftId}',event)"
-              style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.06em;background:none;border:1px solid rgba(255,0,81,.3);color:var(--accent-red);border-radius:8px;padding:8px 16px;cursor:pointer;margin-left:auto">Löschen</button>
+            <button class="btn-pill red" style="margin-left:auto" onclick="event.stopPropagation();deleteShift('${shiftId}',event)">Löschen</button>
           </div>
           <div id="edit-msg-${shiftId}" style="font-family:'DM Mono',monospace;font-size:11px;margin-top:.5rem"></div>
 
@@ -931,7 +930,7 @@ body { overscroll-behavior: none; }
         <div style="display:flex;gap:.5rem">
           <button onclick="saveBreakEdit('${breakId}','${shiftId}')" style="flex:1;font-family:'DM Mono',monospace;font-size:11px;background:var(--green);color:#0a0a0b;border:none;border-radius:8px;padding:10px;cursor:pointer;font-weight:500">Speichern</button>
           <button onclick="document.getElementById('break-edit-overlay').remove()" style="font-family:'DM Mono',monospace;font-size:11px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:10px 16px;cursor:pointer">Abbrechen</button>
-          <button onclick="deleteBreak('${breakId}','${shiftId}',event)" style="font-family:'DM Mono',monospace;font-size:11px;background:none;border:1px solid rgba(255,0,81,.3);color:var(--accent-red);border-radius:8px;padding:10px 14px;cursor:pointer">Löschen</button>
+          <button class="btn-pill red" onclick="deleteBreak('${breakId}','${shiftId}',event)">Löschen</button>
         </div>
         <div id="be-msg" style="font-family:'DM Mono',monospace;font-size:11px;margin-top:.5rem;text-align:center"></div>
       </div>`;

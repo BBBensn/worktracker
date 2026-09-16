@@ -9,7 +9,7 @@ Ablageort: `~/Documents/Coding/bensn-hub/worktracker/CLAUDE.md`
 
 - **Name:** worktracker
 - **Domain:** worktracker.bensn.me
-- **Version:** v2.2.1
+- **Version:** v2.2.2
 - **Status:** active
 - **Stack:** Vanilla JS (PWA, kein Build-Schritt) + Flask + PostgreSQL 16 (Docker)
 
@@ -143,10 +143,12 @@ git push origin main
   "+ Pause"), die Klasse selbst wurde hier aber nie eingeführt — nur als Inline-`style`
   wiederholt (mit leicht abweichenden Werten je Stelle). Seit 2026-09-16 nutzen
   "Bearbeiten"/"+ Pause" die echte `.btn-pill`-Klasse aus `bensn-meta/shared/bensn.css`
-  (identisch zu health/feed/tracking). Die "Löschen"-Buttons in den Save/Cancel/Delete-
-  Formularzeilen (`saveEdit`/`deleteShift`, `deleteBreak`) sind noch NICHT vereinheitlicht —
-  3 verschiedene Font-/Padding-Werte an 2 Stellen, keine gemeinsame Klasse. Vollständiger
-  Style-Guide + die offene Inkonsistenz im Detail: `bensn-meta/design-system.html`
+  (identisch zu health/feed/tracking). Seit v2.2.2 nutzen auch die "Löschen"-Buttons
+  (`deleteShift`, `deleteBreak`) `.btn-pill.red` statt eigener Inline-Styles. Noch offen
+  (beim Aufräumen entdeckt, nicht angefasst): die zugehörigen Speichern/Abbrechen-Buttons in
+  denselben Formularzeilen sind ebenfalls Inline und weichen leicht von `.btn-save`/
+  `.btn-cancel` ab (8px/10px statt 11px Padding-Basis) — eigener Punkt für später.
+  Vollständiger Style-Guide: `bensn-meta/design-system.html`
 
 ---
 
@@ -157,6 +159,7 @@ git push origin main
 | v2.1.6.1 | Vorheriger Stand | ✅ done |
 | v2.2.0 | Zeit-Editierbarkeit in der Eingabe-Seite (Pause Start/Ende) + Long-Press-Edit im Aktiv-Tab | ✅ done |
 | v2.2.1 | "Bearbeiten"/"+ Pause" auf die zentrale `.btn-pill`-Klasse umgestellt (vorher Inline-Styles) | ✅ deployed (2026-09-16) |
+| v2.2.2 | "Löschen"-Buttons (`deleteShift`, `deleteBreak`) auf `.btn-pill.red` umgestellt — beide vorherigen Inline-Varianten unterschieden sich sowohl voneinander als auch von tracking/health | ✅ deployed (2026-09-16) |
 
 ---
 
