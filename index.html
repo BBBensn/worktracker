@@ -1138,7 +1138,7 @@ body { overscroll-behavior: none; }
     const list=document.getElementById('shiftsList');
     list.innerHTML='<div class="state-msg">Schichten werden geladen…</div>';
     try{
-      const data=await apiFetch('/api/shifts?limit=30');
+      const data=await apiFetch('/api/shifts?limit=500');
       renderShifts(data.shifts||data);
       shiftsLoaded=true;
     }catch(e){
@@ -1152,18 +1152,19 @@ body { overscroll-behavior: none; }
     const container=document.getElementById('statsContent');
     container.innerHTML='<div class="state-msg">Statistik wird geladen…</div>';
     try{
-      const [monthly, byType] = await Promise.all([
+      const [monthly, byType, extremes] = await Promise.all([
         apiFetch('/api/stats/monthly'),
-        apiFetch('/api/stats/shift-summary')
+        apiFetch('/api/stats/shift-summary'),
+        apiFetch('/api/stats/extremes')
       ]);
-      renderStats(monthly, byType);
+      renderStats(monthly, byType, extremes);
       statsLoaded=true;
     }catch(e){
       container.innerHTML=`<div class="state-msg">Fehler: ${e.message}<br><button onclick="loadStats()" style="margin-top:.75rem;font-family:'DM Mono',monospace;font-size:11px;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 14px;border-radius:6px;cursor:pointer">Neu laden</button></div>`;
     }
   }
 
-  function renderStats(monthly, byType){
+  function renderStats(monthly, byType, extremes){
     const container=document.getElementById('statsContent');
     if(!monthly||monthly.length===0){
       container.innerHTML='<div class="state-msg">Noch keine abgeschlossenen Schichten für Statistiken.</div>';
@@ -1193,7 +1194,7 @@ body { overscroll-behavior: none; }
             <span class="typ-row-count">${t.count} · ${pct}%</span>
           </div>
           <div class="typ-bar-track"><div class="typ-bar-fill" style="width:${pct}%;background:${color}"></div></div>
-          <div class="typ-row-meta">Ø ${fmtDuration(t.avg_duration_minutes)} Dienst · Ø ${fmtDuration(t.avg_break_minutes)} Pause · Ø ${t.avg_cigarettes||0} Zig.</div>
+          <div class="typ-row-meta">Ø ${fmtDuration(t.avg_duration_minutes)} Dienst · Ø ${fmtDuration(t.avg_break_minutes)} Pause · Ø ${t.avg_cigarettes||0} Zig. (${t.avg_spicy||0} Spicy)</div>
         </div>`;
     }).join('');
 
@@ -1214,6 +1215,33 @@ body { overscroll-behavior: none; }
           <div class="stats-bar-label">${MONTHS_SHORT[d.getMonth()]}</div>
         </div>`;
     }).join('');
+
+    // ── Extremwerte ──
+    const extremeRows=[];
+    if(extremes?.longest_break){
+      const b=extremes.longest_break;
+      extremeRows.push(`
+        <div class="typ-row">
+          <div class="typ-row-head"><span class="typ-row-name">Längste Pause</span><span class="typ-row-count">${fmtDuration(b.duration_minutes)}</span></div>
+          <div class="typ-row-meta">${b.break_type||'Pause'} · ${fmtDate(b.break_start)} · ${b.station||'—'}</div>
+        </div>`);
+    }
+    if(extremes?.longest_shift){
+      const s=extremes.longest_shift;
+      extremeRows.push(`
+        <div class="typ-row">
+          <div class="typ-row-head"><span class="typ-row-name">Längster Dienst</span><span class="typ-row-count">${fmtDuration(s.netto_minutes)}</span></div>
+          <div class="typ-row-meta">${schichtTyp(s.shift_type)} · ${fmtDate(s.work_start)} · ${s.station||'—'}</div>
+        </div>`);
+    }
+    if(extremes?.shortest_shift){
+      const s=extremes.shortest_shift;
+      extremeRows.push(`
+        <div class="typ-row">
+          <div class="typ-row-head"><span class="typ-row-name">Kürzester Dienst</span><span class="typ-row-count">${fmtDuration(s.netto_minutes)}</span></div>
+          <div class="typ-row-meta">${schichtTyp(s.shift_type)} · ${fmtDate(s.work_start)} · ${s.station||'—'}</div>
+        </div>`);
+    }
 
     container.innerHTML=`
       <div class="wt-card">
@@ -1241,6 +1269,12 @@ body { overscroll-behavior: none; }
         <div class="wt-label">Netto-Stunden pro Monat</div>
         <div class="stats-chart">${chartBars}</div>
       </div>
+
+      ${extremeRows.length?`
+      <div class="wt-card" style="margin-top:1rem">
+        <div class="wt-label">Extremwerte</div>
+        ${extremeRows.join('')}
+      </div>`:''}
     `;
   }
 
