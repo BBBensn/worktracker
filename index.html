@@ -233,6 +233,10 @@ body { overscroll-behavior: none; }
 
 <script src="/shared/bensn.js"></script>
 <script>
+  // Doppel-Submit-Schutz: verhindert doppelt angelegte Pausen bei Doppel-Tap
+  // oder langsamer Verbindung (Ursache historischer Duplikate)
+  let isSubmitting = false;
+
   /* ── Clock ── */
   function pad(n){return String(n).padStart(2,'0')}
   function clockTick(){
@@ -873,6 +877,7 @@ body { overscroll-behavior: none; }
   }
 
   async function submitAddBreak(shiftId, baseDateFallback) {
+    if(isSubmitting) return;
     const baseDate  = document.getElementById('ab-date')?.value || baseDateFallback;
     const startTime = document.getElementById('ab-start').value;
     const endTime   = document.getElementById('ab-end').value;
@@ -887,6 +892,7 @@ body { overscroll-behavior: none; }
       .filter(el => el.dataset.active === '1')
       .map(el => el.dataset.val);
     const breakType = selectedTypes.length > 0 ? selectedTypes.join(' + ') : 'Pause';
+    isSubmitting = true;
 
     // Handle overnight: if end < start, end is next day
     let endDate = baseDate;
@@ -917,14 +923,17 @@ body { overscroll-behavior: none; }
           shiftsLoaded=false;
           loadShifts();
           loadActive();
+          isSubmitting = false;
         }, 700);
       } else {
         msg.style.color = 'var(--accent-red)';
         msg.textContent = d.error || 'Fehler';
+        isSubmitting = false;
       }
     } catch(e) {
       msg.style.color = 'var(--accent-red)';
       msg.textContent = 'Verbindungsfehler';
+      isSubmitting = false;
     }
   }
 

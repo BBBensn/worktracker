@@ -574,6 +574,10 @@ const state = {
   openBreak: null
 };
 
+// Doppel-Submit-Schutz: verhindert doppelt angelegte Schichten/Pausen bei
+// Doppel-Tap oder langsamer Verbindung (Ursache historischer Duplikate)
+let isSubmitting = false;
+
 /* ── Time Helpers ── */
 function toLocalISO(iso) {
   if(!iso) return '';
@@ -814,8 +818,10 @@ function showToast(msg, type='') {
 
 /* ── Submit: Dienst starten ── */
 async function submitStart() {
+  if(isSubmitting) return;
   if(!state.sender) { showToast('Bitte Sender auswählen', 'error'); return; }
   if(!state.shift_type) { showToast('Bitte Schichttyp auswählen', 'error'); return; }
+  isSubmitting = true;
 
   let notes = null;
   let training_note = null;
@@ -859,14 +865,18 @@ async function submitStart() {
       setTimeout(() => { location.href = '/'; }, 1200);
     } else {
       showToast(d.error || 'Fehler', 'error');
+      isSubmitting = false;
     }
   } catch(e) {
     showToast('Verbindungsfehler', 'error');
+    isSubmitting = false;
   }
 }
 
 /* ── Submit: Pause Start ── */
 async function submitPauseStart() {
+  if(isSubmitting) return;
+  isSubmitting = true;
   const timeVal = document.getElementById('pauseStartTime')?.value;
   const today = toLocalISO(new Date().toISOString()).split('T')[0];
   const break_start = timeVal ? localToUTC(`${today}T${timeVal}`) : undefined;
@@ -878,14 +888,18 @@ async function submitPauseStart() {
       setTimeout(() => { location.href = '/'; }, 1200);
     } else {
       showToast(d.error || 'Fehler', 'error');
+      isSubmitting = false;
     }
   } catch(e) {
     showToast('Verbindungsfehler', 'error');
+    isSubmitting = false;
   }
 }
 
 /* ── Submit: Pause Ende ── */
 async function submitPauseEnd() {
+  if(isSubmitting) return;
+  isSubmitting = true;
   const pauseType = state.pauseTypes.length > 0
     ? state.pauseTypes.join(' + ')
     : 'Pause';
@@ -925,14 +939,18 @@ async function submitPauseEnd() {
       setTimeout(() => { location.href = '/'; }, 1200);
     } else {
       showToast(d.error || 'Fehler', 'error');
+      isSubmitting = false;
     }
   } catch(e) {
     showToast('Verbindungsfehler', 'error');
+    isSubmitting = false;
   }
 }
 
 /* ── Submit: Dienst Ende ── */
 async function submitEnd() {
+  if(isSubmitting) return;
+  isSubmitting = true;
   const notes = document.getElementById('endNotes').value || null;
 
   const endTimeVal = document.getElementById('endTime')?.value;
@@ -957,15 +975,19 @@ async function submitEnd() {
       setTimeout(() => { location.href = '/'; }, 1200);
     } else {
       showToast(d.error || 'Fehler', 'error');
+      isSubmitting = false;
     }
   } catch(e) {
     showToast('Verbindungsfehler', 'error');
+    isSubmitting = false;
   }
 }
 
 /* ── Submit: Sender ── */
 async function submitSender() {
+  if(isSubmitting) return;
   if(!state.new_sender) { showToast('Bitte Sender auswählen', 'error'); return; }
+  isSubmitting = true;
   const payload = {
     station: state.new_sender,
     duo_partner_station: state.new_sender2 || null,
@@ -979,9 +1001,11 @@ async function submitSender() {
       setTimeout(() => { location.href = '/'; }, 1200);
     } else {
       showToast(d.error || 'Fehler', 'error');
+      isSubmitting = false;
     }
   } catch(e) {
     showToast('Verbindungsfehler', 'error');
+    isSubmitting = false;
   }
 }
 

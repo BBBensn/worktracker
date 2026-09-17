@@ -9,7 +9,7 @@ Ablageort: `~/Documents/Coding/bensn-hub/worktracker/CLAUDE.md`
 
 - **Name:** worktracker
 - **Domain:** worktracker.bensn.me
-- **Version:** v2.4.1
+- **Version:** v2.4.2
 - **Status:** active
 - **Stack:** Vanilla JS (PWA, kein Build-Schritt) + Flask + PostgreSQL 16 (Docker)
 
@@ -163,6 +163,7 @@ git push origin main
 | v2.3.0 | Zeit-Eingabe für "Dienst starten"/"Dienst beenden" (analog Pause-Muster) + monatsweises Zuklappen der Schichten-Liste + neuer "Stats"-Tab (Gesamt/Ø-Werte, Schichttyp-Aufteilung, 12-Monats-Verlauf) mit neuem Backend-Endpoint `GET /api/stats/monthly` | ✅ deployed (2026-09-17) |
 | v2.4.0 | Stats-Feedback: Fix für `/api/shifts`-Limit (30→500, ältere Monate wurden gar nicht geladen), Spicy-Ø in der Schichttyp-Aufteilung, neue Extremwerte-Card (längste Pause, längster/kürzester Dienst) via neuem `GET /api/stats/extremes` | ✅ deployed (2026-09-17) |
 | v2.4.1 | Fix: `sw.js` cachte `/shared/bensn.css` für immer (cache-only, nie invalidiert) — dadurch liefen "Bearbeiten"/"+ Pause"/"Löschen" auf altem, unstyled Stand. Umgestellt auf Stale-while-revalidate + Cache-Version gebumpt | ✅ deployed (2026-09-17) |
+| v2.4.2 | Doppel-Submit-Schutz in allen Schicht-/Pause-Erstell-Formularen (eingabe + "+ Pause") — wahrscheinliche Root Cause der historischen Duplikat-Pausen (14.04./13.07./08.06., bereits per Soft-Delete bereinigt) | ✅ deployed (2026-09-17) |
 
 ---
 
