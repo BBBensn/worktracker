@@ -476,7 +476,8 @@ body { overscroll-behavior: none; }
           ${s.notes?`<span class="tag" style="color:var(--accent-blue)">Notiz</span>`:''}
         </div>
         <div style="text-align:right;flex-shrink:0">
-          <div class="wt-shift-netto">${nettoMin!==null?fmtDuration(nettoMin):'—'}</div>
+          <div class="wt-shift-netto">Netto ${nettoMin!==null?fmtDuration(nettoMin):'—'}</div>
+          <div class="wt-shift-meta">Brutto ${grossMin!==null?fmtDuration(grossMin):'—'}</div>
           <div class="wt-shift-status" style="color:${isActive?'var(--green)':'var(--muted)'}">${isActive?'aktiv':'abgeschlossen'}</div>
           <div class="expand-arrow" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-top:4px">▼</div>
         </div>
@@ -1203,7 +1204,7 @@ body { overscroll-behavior: none; }
             <span class="typ-row-count">${t.count} · ${pct}%</span>
           </div>
           <div class="typ-bar-track"><div class="typ-bar-fill" style="width:${pct}%;background:${color}"></div></div>
-          <div class="typ-row-meta">Ø ${fmtDuration(t.avg_duration_minutes)} Dienst · Ø ${fmtDuration(t.avg_break_minutes)} Pause · Ø ${t.avg_cigarettes||0} Zig. (${t.avg_spicy||0} Spicy)</div>
+          <div class="typ-row-meta">Ø ${fmtDuration(t.avg_duration_minutes)} Brutto · Ø ${fmtDuration(t.avg_break_minutes)} Pause · Ø ${t.avg_cigarettes||0} Zig. (${t.avg_spicy||0} Spicy)</div>
         </div>`;
     }).join('');
 
@@ -1237,18 +1238,20 @@ body { overscroll-behavior: none; }
     }
     if(extremes?.longest_shift){
       const s=extremes.longest_shift;
+      const gross=Math.round((new Date(s.work_end)-new Date(s.work_start))/60000);
       extremeRows.push(`
         <div class="typ-row">
-          <div class="typ-row-head"><span class="typ-row-name">Längster Dienst</span><span class="typ-row-count">${fmtDuration(s.netto_minutes)}</span></div>
-          <div class="typ-row-meta">${schichtTyp(s.shift_type)} · ${fmtDate(s.work_start)} · ${s.station||'—'}</div>
+          <div class="typ-row-head"><span class="typ-row-name">Längster Dienst (Netto)</span><span class="typ-row-count">${fmtDuration(s.netto_minutes)}</span></div>
+          <div class="typ-row-meta">${schichtTyp(s.shift_type)} · ${fmtDate(s.work_start)} · ${s.station||'—'} · Brutto ${fmtDuration(gross)}</div>
         </div>`);
     }
     if(extremes?.shortest_shift){
       const s=extremes.shortest_shift;
+      const gross=Math.round((new Date(s.work_end)-new Date(s.work_start))/60000);
       extremeRows.push(`
         <div class="typ-row">
-          <div class="typ-row-head"><span class="typ-row-name">Kürzester Dienst</span><span class="typ-row-count">${fmtDuration(s.netto_minutes)}</span></div>
-          <div class="typ-row-meta">${schichtTyp(s.shift_type)} · ${fmtDate(s.work_start)} · ${s.station||'—'}</div>
+          <div class="typ-row-head"><span class="typ-row-name">Kürzester Dienst (Netto)</span><span class="typ-row-count">${fmtDuration(s.netto_minutes)}</span></div>
+          <div class="typ-row-meta">${schichtTyp(s.shift_type)} · ${fmtDate(s.work_start)} · ${s.station||'—'} · Brutto ${fmtDuration(gross)}</div>
         </div>`);
     }
 
