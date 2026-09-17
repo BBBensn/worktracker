@@ -361,6 +361,10 @@ body { overscroll-behavior: none; }
   <!-- ══════════════════════════════════════════════ -->
   <div class="form-section" id="form-start">
     <div class="form-group">
+      <label class="form-label">Startzeit</label>
+      <input type="time" class="text-input" id="startTime">
+    </div>
+    <div class="form-group">
       <label class="form-label">Sender</label>
       <div class="pill-group" id="senderPills">
         <div class="pill" data-val="Puls4" onclick="selectPill(this,'sender');checkCafePuls()">Puls4</div>
@@ -515,6 +519,10 @@ body { overscroll-behavior: none; }
   <!-- FORM: Dienst beenden                          -->
   <!-- ══════════════════════════════════════════════ -->
   <div class="form-section" id="form-end">
+    <div class="form-group">
+      <label class="form-label">Endzeit</label>
+      <input type="time" class="text-input" id="endTime">
+    </div>
     <div class="form-group">
       <label class="form-label">Anmerkung zum Dienst</label>
       <textarea class="text-input" id="endNotes" rows="3" placeholder="Optional…" style="resize:none"></textarea>
@@ -694,6 +702,10 @@ function showForm(action) {
   const form = document.getElementById(`form-${action}`);
   if(form) form.classList.add('active');
 
+  if(action === 'start') {
+    const el = document.getElementById('startTime');
+    if(el) el.value = toLocalISO(new Date().toISOString()).split('T')[1];
+  }
   if(action === 'pause_start') {
     const el = document.getElementById('pauseStartTime');
     if(el) el.value = toLocalISO(new Date().toISOString()).split('T')[1];
@@ -703,6 +715,10 @@ function showForm(action) {
     const endEl = document.getElementById('pauseEndEndTime');
     if(startEl) startEl.value = state.openBreak ? toLocalISO(state.openBreak.break_start).split('T')[1] : '';
     if(endEl) endEl.value = toLocalISO(new Date().toISOString()).split('T')[1];
+  }
+  if(action === 'end') {
+    const el = document.getElementById('endTime');
+    if(el) el.value = toLocalISO(new Date().toISOString()).split('T')[1];
   }
 
   const titles = {
@@ -818,6 +834,10 @@ async function submitStart() {
     notes = document.getElementById('anderesNote').value;
   }
 
+  const startTimeVal = document.getElementById('startTime')?.value;
+  const today = toLocalISO(new Date().toISOString()).split('T')[0];
+  const work_start = startTimeVal ? localToUTC(`${today}T${startTimeVal}`) : undefined;
+
   const payload = {
     shift_type: state.shift_type,
     station: state.sender,
@@ -828,6 +848,7 @@ async function submitStart() {
     training_note,
     notes,
     cafe_puls: state.cafe_puls === 'true' || state.cafe_puls === true,
+    work_start,
     source: 'pwa'
   };
 
@@ -913,8 +934,24 @@ async function submitPauseEnd() {
 /* ── Submit: Dienst Ende ── */
 async function submitEnd() {
   const notes = document.getElementById('endNotes').value || null;
+
+  const endTimeVal = document.getElementById('endTime')?.value;
+  let work_end;
+  if(endTimeVal && state.currentShift) {
+    const startDate = toLocalISO(state.currentShift.work_start).split('T')[0];
+    const startTime = toLocalISO(state.currentShift.work_start).split('T')[1];
+    // Overnight: falls Endzeit vor Dienstbeginn-Uhrzeit liegt, Ende auf Folgetag setzen
+    let endDate = startDate;
+    if(endTimeVal < startTime) {
+      const d = new Date(startDate);
+      d.setDate(d.getDate() + 1);
+      endDate = d.toISOString().split('T')[0];
+    }
+    work_end = localToUTC(`${endDate}T${endTimeVal}`);
+  }
+
   try {
-    const d = await apiFetch('/api/shift/end', 'POST', { notes, source: 'pwa' });
+    const d = await apiFetch('/api/shift/end', 'POST', { notes, work_end, source: 'pwa' });
     if(d.shift) {
       showToast('Dienst beendet ✓', 'success');
       setTimeout(() => { location.href = '/'; }, 1200);

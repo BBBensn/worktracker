@@ -144,6 +144,47 @@ body { overscroll-behavior: none; }
 .wt-table th.col-typ, .wt-table td.col-typ {
   width: 60px;
 }
+
+/* ── Stats: Shift-Type Breakdown ── */
+.typ-row { margin-bottom: 1rem; }
+.typ-row:last-child { margin-bottom: 0; }
+.typ-row-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-family: 'DM Mono', monospace; font-size: 12px; margin-bottom: 4px;
+}
+.typ-row-name { color: var(--text); font-weight: 500; }
+.typ-row-count { color: var(--muted); font-size: 11px; }
+.typ-bar-track {
+  height: 6px; border-radius: 3px; background: rgba(255,255,255,.06);
+  overflow: hidden; margin-bottom: 4px;
+}
+.typ-bar-fill { height: 100%; border-radius: 3px; transition: width .5s ease; }
+.typ-row-meta { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); }
+
+/* ── Stats: Monthly Trend Chart ── */
+.stats-chart {
+  display: flex; align-items: stretch; gap: 6px;
+  height: 150px; padding-top: 1.25rem;
+}
+.stats-bar-col {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  min-width: 0;
+}
+.stats-bar-value {
+  font-family: 'DM Mono', monospace; font-size: 9px; color: var(--muted);
+  margin-bottom: 4px; white-space: nowrap;
+}
+.stats-bar-track {
+  flex: 1; width: 100%; max-width: 22px; display: flex; align-items: flex-end;
+}
+.stats-bar-fill {
+  width: 100%; background: var(--green); border-radius: 4px 4px 0 0;
+  min-height: 3px; transition: height .5s ease;
+}
+.stats-bar-label {
+  font-family: 'DM Mono', monospace; font-size: 9px; color: var(--muted);
+  margin-top: 6px; letter-spacing: .04em;
+}
 </style>
 </head>
 <body>
@@ -168,6 +209,7 @@ body { overscroll-behavior: none; }
   <div class="tabs">
     <button class="tab active" onclick="switchTab('aktiv',this)">Aktiv</button>
     <button class="tab" onclick="switchTab('schichten',this)">Schichten</button>
+    <button class="tab" onclick="switchTab('stats',this)">Stats</button>
     <a class="tab" href="/eingabe" style="margin-left:auto;text-decoration:none;color:var(--accent-blue);border-bottom-color:transparent">+ Eingabe</a>
   </div>
 
@@ -177,6 +219,10 @@ body { overscroll-behavior: none; }
 
   <div id="tab-schichten" class="tab-section">
     <div id="shiftsList"><div class="state-msg">Schichten werden geladen…</div></div>
+  </div>
+
+  <div id="tab-stats" class="tab-section">
+    <div id="statsContent"><div class="state-msg">Statistik wird geladen…</div></div>
   </div>
 
   <footer style="border-top:1px solid var(--border);padding:1rem 0;display:flex;justify-content:space-between;margin-top:auto">
@@ -202,7 +248,9 @@ body { overscroll-behavior: none; }
     el.classList.add('active');
     document.getElementById('tab-aktiv').classList.toggle('visible',t==='aktiv');
     document.getElementById('tab-schichten').classList.toggle('visible',t==='schichten');
+    document.getElementById('tab-stats').classList.toggle('visible',t==='stats');
     if(t==='schichten') loadShifts();
+    if(t==='stats' && !statsLoaded) loadStats();
   }
 
   /* ── Helpers ── */
@@ -363,19 +411,42 @@ body { overscroll-behavior: none; }
     const MONTHS_DE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
     let lastMonthKey = null;
     let animIdx = 0;
+    let currentBody = null;
+    const now = new Date();
+    const nowKey = `${now.getFullYear()}-${now.getMonth()}`;
 
     shifts.forEach((s,i)=>{
-      // ── Month header ──
+      // ── Month header (collapsible) ──
       const d = new Date(s.work_start);
       const monthKey = `${d.getFullYear()}-${d.getMonth()}`;
       if(monthKey !== lastMonthKey){
         lastMonthKey = monthKey;
+        const isOpen = monthKey === nowKey;
+
+        const group = document.createElement('div');
+        group.className = 'month-group';
+
         const hdr = document.createElement('div');
-        hdr.style.cssText="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;letter-spacing:-0.02em;color:var(--text);margin:1.75rem 0 .75rem;opacity:0;transition:opacity .4s ease";
-        hdr.textContent = MONTHS_DE[d.getMonth()] + ' ' + d.getFullYear();
-        list.appendChild(hdr);
+        hdr.className = 'month-header';
+        hdr.style.cssText="display:flex;align-items:center;gap:.5rem;cursor:pointer;-webkit-tap-highlight-color:transparent;font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;letter-spacing:-0.02em;color:var(--text);margin:1.75rem 0 .75rem;opacity:0;transition:opacity .4s ease;user-select:none";
+        hdr.innerHTML = `<span class="month-arrow" style="font-size:.8rem;color:var(--muted);display:inline-block;transition:transform .2s;transform:rotate(${isOpen?0:-90}deg)">▼</span><span>${MONTHS_DE[d.getMonth()]} ${d.getFullYear()}</span>`;
+
+        const body = document.createElement('div');
+        body.className = 'month-body';
+        body.style.display = isOpen ? 'block' : 'none';
+
+        hdr.addEventListener('click', ()=>{
+          const open = body.style.display !== 'none';
+          body.style.display = open ? 'none' : 'block';
+          hdr.querySelector('.month-arrow').style.transform = `rotate(${open?-90:0}deg)`;
+        });
+
+        group.appendChild(hdr);
+        group.appendChild(body);
+        list.appendChild(group);
         setTimeout(()=>hdr.style.opacity='1', 80 + animIdx*80);
         animIdx++;
+        currentBody = body;
       }
 
       const isActive=!s.work_end;
@@ -414,7 +485,7 @@ body { overscroll-behavior: none; }
         if(e.target.closest('.shift-detail')) return;
         toggleShiftDetail(el, s.id);
       });
-      list.appendChild(el);
+      currentBody.appendChild(el);
       setTimeout(()=>{el.style.opacity='1';el.style.transform='none';},100+animIdx*80);
       animIdx++;
     });
@@ -1073,6 +1144,104 @@ body { overscroll-behavior: none; }
     }catch(e){
       list.innerHTML=`<div class="state-msg">Fehler: ${e.message}<br><button onclick="loadShifts()" style="margin-top:.75rem;font-family:'DM Mono',monospace;font-size:11px;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 14px;border-radius:6px;cursor:pointer">Neu laden</button></div>`;
     }
+  }
+
+  /* ── Stats ── */
+  let statsLoaded=false;
+  async function loadStats(){
+    const container=document.getElementById('statsContent');
+    container.innerHTML='<div class="state-msg">Statistik wird geladen…</div>';
+    try{
+      const [monthly, byType] = await Promise.all([
+        apiFetch('/api/stats/monthly'),
+        apiFetch('/api/stats/shift-summary')
+      ]);
+      renderStats(monthly, byType);
+      statsLoaded=true;
+    }catch(e){
+      container.innerHTML=`<div class="state-msg">Fehler: ${e.message}<br><button onclick="loadStats()" style="margin-top:.75rem;font-family:'DM Mono',monospace;font-size:11px;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 14px;border-radius:6px;cursor:pointer">Neu laden</button></div>`;
+    }
+  }
+
+  function renderStats(monthly, byType){
+    const container=document.getElementById('statsContent');
+    if(!monthly||monthly.length===0){
+      container.innerHTML='<div class="state-msg">Noch keine abgeschlossenen Schichten für Statistiken.</div>';
+      return;
+    }
+
+    // ── Gesamt-Summen (aus den Monatsdaten) ──
+    const totalShifts=monthly.reduce((a,m)=>a+Number(m.shift_count||0),0);
+    const totalWorkMin=monthly.reduce((a,m)=>a+Number(m.total_work_minutes||0),0);
+    const totalBreakMin=monthly.reduce((a,m)=>a+Number(m.total_break_minutes||0),0);
+    const totalNettoMin=Math.max(0,totalWorkMin-totalBreakMin);
+    const totalSpicy=monthly.reduce((a,m)=>a+Number(m.total_zig_spicy||0),0);
+    const totalBlend=monthly.reduce((a,m)=>a+Number(m.total_zig_blend||0),0);
+    const avgNettoPerShift=totalShifts>0?Math.round(totalNettoMin/totalShifts):0;
+    const avgBreakPerShift=totalShifts>0?Math.round(totalBreakMin/totalShifts):0;
+
+    // ── Aufteilung nach Schichttyp ──
+    const typColors={'früh':'#FFB400','nachmittag':'#F96F5D','nacht':'#00A6ED'};
+    const typeTotal=(byType||[]).reduce((a,t)=>a+Number(t.count||0),0);
+    const typeRows=(byType||[]).map(t=>{
+      const pct=typeTotal>0?Math.round(Number(t.count)/typeTotal*100):0;
+      const color=typColors[t.shift_type]||'var(--muted)';
+      return `
+        <div class="typ-row">
+          <div class="typ-row-head">
+            <span class="typ-row-name">${schichtTyp(t.shift_type)}</span>
+            <span class="typ-row-count">${t.count} · ${pct}%</span>
+          </div>
+          <div class="typ-bar-track"><div class="typ-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+          <div class="typ-row-meta">Ø ${fmtDuration(t.avg_duration_minutes)} Dienst · Ø ${fmtDuration(t.avg_break_minutes)} Pause · Ø ${t.avg_cigarettes||0} Zig.</div>
+        </div>`;
+    }).join('');
+
+    // ── Verlauf: Netto-Stunden pro Monat (letzte 12) ──
+    const MONTHS_SHORT=['Jän','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+    const recent=monthly.slice(-12);
+    const nettoByMonth=recent.map(m=>Math.max(0,Number(m.total_work_minutes||0)-Number(m.total_break_minutes||0)));
+    const maxNetto=Math.max(...nettoByMonth,1);
+    const chartBars=recent.map((m,i)=>{
+      const d=new Date(m.month);
+      const h=nettoByMonth[i]/60;
+      const barPct=nettoByMonth[i]>0?Math.max(4,Math.round(nettoByMonth[i]/maxNetto*100)):0;
+      const label=`${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}: ${fmtDuration(nettoByMonth[i])}`;
+      return `
+        <div class="stats-bar-col" title="${label}">
+          <div class="stats-bar-value">${h>=10?Math.round(h):h.toFixed(1)}h</div>
+          <div class="stats-bar-track"><div class="stats-bar-fill" style="height:${barPct}%"></div></div>
+          <div class="stats-bar-label">${MONTHS_SHORT[d.getMonth()]}</div>
+        </div>`;
+    }).join('');
+
+    container.innerHTML=`
+      <div class="wt-card">
+        <div class="wt-label">Gesamt</div>
+        <div class="wt-stats">
+          <div class="wt-stat"><div class="wt-stat-val" style="color:var(--green)">${fmtDuration(totalNettoMin)}</div><div class="wt-stat-label">Netto gesamt</div></div>
+          <div class="wt-stat"><div class="wt-stat-val" style="color:var(--accent-blue)">${totalShifts}</div><div class="wt-stat-label">Schichten</div></div>
+          <div class="wt-stat"><div class="wt-stat-val">${fmtDuration(avgNettoPerShift)}</div><div class="wt-stat-label">Ø Netto/Schicht</div></div>
+          <div class="wt-stat"><div class="wt-stat-val" style="color:var(--orange)">${avgBreakPerShift} min</div><div class="wt-stat-label">Ø Pause/Schicht</div></div>
+        </div>
+        <div class="wt-divider"></div>
+        <div class="wt-cigs">
+          <div class="wt-cig"><div class="wt-cig-num" style="color:${totalSpicy>0?'var(--orange)':'rgba(255,255,255,.15)'}">${totalSpicy}</div><div class="wt-cig-label">Spicy</div></div>
+          <div class="wt-cig"><div class="wt-cig-num" style="color:${totalBlend>0?'var(--accent-blue)':'rgba(255,255,255,.15)'}">${totalBlend}</div><div class="wt-cig-label">Blend</div></div>
+          <div class="wt-cig"><div class="wt-cig-num">${totalSpicy+totalBlend}</div><div class="wt-cig-label">Gesamt</div></div>
+        </div>
+      </div>
+
+      <div class="wt-card" style="margin-top:1rem">
+        <div class="wt-label">Nach Schichttyp</div>
+        ${typeRows||'<div class="state-msg">Keine Daten</div>'}
+      </div>
+
+      <div class="wt-card" style="margin-top:1rem">
+        <div class="wt-label">Netto-Stunden pro Monat</div>
+        <div class="stats-chart">${chartBars}</div>
+      </div>
+    `;
   }
 
   // PWA: tap error to reload

@@ -9,7 +9,7 @@ Ablageort: `~/Documents/Coding/bensn-hub/worktracker/CLAUDE.md`
 
 - **Name:** worktracker
 - **Domain:** worktracker.bensn.me
-- **Version:** v2.2.2
+- **Version:** v2.3.0
 - **Status:** active
 - **Stack:** Vanilla JS (PWA, kein Build-Schritt) + Flask + PostgreSQL 16 (Docker)
 
@@ -160,6 +160,7 @@ git push origin main
 | v2.2.0 | Zeit-Editierbarkeit in der Eingabe-Seite (Pause Start/Ende) + Long-Press-Edit im Aktiv-Tab | ✅ done |
 | v2.2.1 | "Bearbeiten"/"+ Pause" auf die zentrale `.btn-pill`-Klasse umgestellt (vorher Inline-Styles) | ✅ deployed (2026-09-16) |
 | v2.2.2 | "Löschen"-Buttons (`deleteShift`, `deleteBreak`) auf `.btn-pill.red` umgestellt — beide vorherigen Inline-Varianten unterschieden sich sowohl voneinander als auch von tracking/health | ✅ deployed (2026-09-16) |
+| v2.3.0 | Zeit-Eingabe für "Dienst starten"/"Dienst beenden" (analog Pause-Muster) + monatsweises Zuklappen der Schichten-Liste + neuer "Stats"-Tab (Gesamt/Ø-Werte, Schichttyp-Aufteilung, 12-Monats-Verlauf) mit neuem Backend-Endpoint `GET /api/stats/monthly` | ✅ deployed (2026-09-17) |
 
 ---
 
