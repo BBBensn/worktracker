@@ -1,4 +1,4 @@
-const CACHE = 'bensn-wt-v2';
+const CACHE = 'bensn-wt-v3';
 const STATIC = [
   '/shared/bensn.css',
   '/shared/bensn.js',
@@ -27,19 +27,20 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Shared static files: cache first
+  // Shared static files: stale-while-revalidate — serve cached instantly,
+  // but always refetch in the background so a later shared/bensn.css change
+  // (edited from another app's repo) reaches this PWA without a version bump here
   if (url.pathname.startsWith('/shared/')) {
     e.respondWith(
-      caches.match(e.request).then(cached => {
-        if (cached) return cached;
-        return fetch(e.request).then(res => {
-          if (res.ok) {
-            const clone = res.clone();
-            caches.open(CACHE).then(c => c.put(e.request, clone));
-          }
-          return res;
-        });
-      })
+      caches.open(CACHE).then(cache =>
+        cache.match(e.request).then(cached => {
+          const fetchPromise = fetch(e.request).then(res => {
+            if (res.ok) cache.put(e.request, res.clone());
+            return res;
+          }).catch(() => cached);
+          return cached || fetchPromise;
+        })
+      )
     );
     return;
   }
