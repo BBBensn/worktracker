@@ -168,8 +168,8 @@ git push origin main
 
 ---
 
-## Obsidian-Doku
+## Projekt-Doku
 
-- Projekt-MD: `03_Projects/Coding PC/worktracker/worktracker.md`
-- Changelogs: `03_Projects/Coding PC/worktracker/Changelogs/`
-- Changelog-All: `03_Projects/Coding PC/worktracker/worktracker-Changelog-All.md`
+- Projekt-MD: `docs/Worktracker.md` (lokal im Repo) — seit 2026-10-04 mit dem Hinweis, dass die Oberfläche im Work-Tab der Gesamt-App
+  (`tracking/`) lebt und `worktracker.bensn.me/` dorthin umleitet; `/api/` bleibt. Nutzer kopiert in den Vault
+- Vault-Ziel: `03_Projects/Coding PC/Bensn-Hub/Worktracker/Worktracker.md`
